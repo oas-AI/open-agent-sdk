@@ -3,7 +3,7 @@
  * Core agent logic for tool use and reasoning
  */
 
-import type { LLMProvider, LLMChunk } from '../providers/base';
+import type { LLMProvider } from '../providers/base';
 import type { ToolRegistry } from '../tools/registry';
 import type { Tool, ToolContext } from '../types/tools';
 import {

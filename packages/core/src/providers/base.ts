@@ -2,7 +2,7 @@
  * Base provider interface for LLM integrations
  */
 
-import { SDKMessage, SDKAssistantMessage } from '../types/messages';
+import { SDKMessage } from '../types/messages';
 import { ToolDefinition } from '../types/tools';
 
 /** Chunk from streaming LLM response */

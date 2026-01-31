@@ -4,7 +4,7 @@
 
 import OpenAI from 'openai';
 import { LLMProvider, type LLMChunk } from './base';
-import type { SDKMessage, SDKAssistantMessage, SDKToolResultMessage } from '../types/messages';
+import type { SDKMessage } from '../types/messages';
 import type { ToolDefinition } from '../types/tools';
 
 export interface OpenAIConfig {

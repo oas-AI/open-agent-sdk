@@ -7,7 +7,7 @@ import { OpenAIProvider } from './providers/openai';
 import { GoogleProvider } from './providers/google';
 import { createDefaultRegistry } from './tools/registry';
 import { ReActLoop } from './agent/react-loop';
-import type { ToolRegistry } from './tools/registry';
+// ToolRegistry type used indirectly through createDefaultRegistry
 
 export interface PromptOptions {
   /** Model identifier (e.g., 'gpt-4', 'gpt-4o', 'gemini-2.0-flash') */
@@ -110,8 +110,7 @@ export async function prompt(
   };
 }
 
-// Re-export types
-export type { PromptOptions, PromptResult };
+// PromptOptions and PromptResult are already exported as interfaces above
 
 // Re-export core types
 export type {

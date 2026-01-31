@@ -2,7 +2,7 @@
  * Google Gemini Provider implementation using @google/genai
  */
 
-import { GoogleGenAI, type Content, type Part } from '@google/genai';
+import { GoogleGenAI, type Content, type Part, type Schema } from '@google/genai';
 import { LLMProvider, type LLMChunk } from './base';
 import type { SDKMessage } from '../types/messages';
 import type { ToolDefinition } from '../types/tools';
@@ -53,7 +53,7 @@ export class GoogleProvider extends LLMProvider {
         {
           name: tool.function.name,
           description: tool.function.description,
-          parameters: tool.function.parameters,
+          parameters: tool.function.parameters as unknown as Schema,
         },
       ],
     }));
@@ -71,7 +71,7 @@ export class GoogleProvider extends LLMProvider {
       tools?: Array<{ functionDeclarations: Array<{
         name: string;
         description: string;
-        parameters?: unknown;
+        parameters?: Schema;
       }> }>;
     } = {
       maxOutputTokens: this.config.maxTokens,

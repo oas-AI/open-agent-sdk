@@ -3,19 +3,19 @@
  */
 
 import type { Tool, ToolDefinition } from '../types/tools';
-import { readTool, ReadTool } from './read';
-import { writeTool, WriteTool } from './write';
-import { editTool, EditTool } from './edit';
-import { bashTool, BashTool } from './bash';
+import { ReadTool } from './read';
+import { WriteTool } from './write';
+import { EditTool } from './edit';
+import { BashTool } from './bash';
 
 export class ToolRegistry {
-  private tools = new Map<string, Tool>();
+  private tools = new Map<string, Tool<any, any>>();
 
-  register(tool: Tool): void {
+  register(tool: Tool<any, any>): void {
     this.tools.set(tool.name, tool);
   }
 
-  get(name: string): Tool | undefined {
+  get(name: string): Tool<any, any> | undefined {
     return this.tools.get(name);
   }
 
@@ -23,7 +23,7 @@ export class ToolRegistry {
     return this.tools.has(name);
   }
 
-  getAll(): Tool[] {
+  getAll(): Tool<any, any>[] {
     return Array.from(this.tools.values());
   }
 
@@ -38,13 +38,13 @@ export class ToolRegistry {
     }));
   }
 
-  getAllowedTools(allowedTools?: string[]): Tool[] {
+  getAllowedTools(allowedTools?: string[]): Tool<any, any>[] {
     if (!allowedTools || allowedTools.length === 0) {
       return this.getAll();
     }
     return allowedTools
       .map((name) => this.tools.get(name))
-      .filter((tool): tool is Tool => tool !== undefined);
+      .filter((tool): tool is Tool<any, any> => tool !== undefined);
   }
 }
 
@@ -58,7 +58,7 @@ export function createDefaultRegistry(): ToolRegistry {
   return registry;
 }
 
-// Global default registry
+// Global default registry with specific tool types
 export const defaultToolRegistry = createDefaultRegistry();
 
 // Re-export tools

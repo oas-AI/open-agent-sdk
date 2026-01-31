@@ -29,24 +29,20 @@ export interface ToolContext {
   abortController?: AbortController;
 }
 
-/** Base tool input */
-export interface ToolInput {
-  [key: string]: unknown;
-}
+/** Base tool input - any object (validation happens at runtime) */
+export type ToolInput = unknown;
 
-/** Base tool output */
-export interface ToolOutput {
-  [key: string]: unknown;
-}
+/** Base tool output - any object */
+export type ToolOutput = unknown;
 
 /** Tool handler function type */
-export type ToolHandler<TInput extends ToolInput, TOutput extends ToolOutput> = (
+export type ToolHandler<TInput = unknown, TOutput = unknown> = (
   input: TInput,
   context: ToolContext
 ) => Promise<TOutput> | TOutput;
 
 /** Complete tool implementation */
-export interface Tool<TInput extends ToolInput = ToolInput, TOutput extends ToolOutput = ToolOutput> {
+export interface Tool<TInput = unknown, TOutput = unknown> {
   name: string;
   description: string;
   parameters: JSONSchema;
