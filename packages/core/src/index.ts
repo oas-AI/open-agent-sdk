@@ -133,6 +133,14 @@ export type {
   JSONSchema,
 } from './types/tools';
 
+// Re-export tool input/output types
+export type { ReadInput, ReadOutput } from './tools/read';
+export type { WriteInput, WriteOutput } from './tools/write';
+export type { EditInput, EditOutput } from './tools/edit';
+export type { BashInput, BashOutput } from './tools/bash';
+export type { GlobInput, GlobOutput } from './tools/glob';
+export type { GrepInput, GrepOutput, GrepMatch } from './tools/grep';
+
 // Re-export providers
 export { LLMProvider, type LLMChunk, type ProviderConfig } from './providers/base';
 export { OpenAIProvider, type OpenAIConfig } from './providers/openai';
@@ -150,6 +158,10 @@ export {
   editTool,
   BashTool,
   bashTool,
+  GlobTool,
+  globTool,
+  GrepTool,
+  grepTool,
 } from './tools/registry';
 
 // Re-export agent

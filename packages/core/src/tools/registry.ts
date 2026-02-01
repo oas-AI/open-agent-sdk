@@ -7,6 +7,8 @@ import { ReadTool } from './read';
 import { WriteTool } from './write';
 import { EditTool } from './edit';
 import { BashTool } from './bash';
+import { GlobTool } from './glob';
+import { GrepTool } from './grep';
 
 export class ToolRegistry {
   private tools = new Map<string, Tool<any, any>>();
@@ -55,6 +57,8 @@ export function createDefaultRegistry(): ToolRegistry {
   registry.register(new WriteTool());
   registry.register(new EditTool());
   registry.register(new BashTool());
+  registry.register(new GlobTool());
+  registry.register(new GrepTool());
   return registry;
 }
 
@@ -66,3 +70,5 @@ export { readTool, ReadTool } from './read';
 export { writeTool, WriteTool } from './write';
 export { editTool, EditTool } from './edit';
 export { bashTool, BashTool } from './bash';
+export { globTool, GlobTool } from './glob';
+export { grepTool, GrepTool } from './grep';
