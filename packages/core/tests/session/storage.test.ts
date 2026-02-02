@@ -171,6 +171,15 @@ describe('InMemoryStorage', () => {
   });
 });
 
+// Helper to generate UUID for tests
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 describe('FileStorage', () => {
   let storage: FileStorage;
   const testDir = '/tmp/open-agent-test-sessions';
@@ -187,8 +196,9 @@ describe('FileStorage', () => {
   });
 
   it('should save and load session', async () => {
+    const sessionId = generateUUID();
     const sessionData: SessionData = {
-      id: 'file-test-1',
+      id: sessionId,
       model: 'gpt-4o',
       provider: 'openai',
       createdAt: Date.now(),
@@ -198,21 +208,23 @@ describe('FileStorage', () => {
     };
 
     await storage.save(sessionData);
-    const loaded = await storage.load('file-test-1');
+    const loaded = await storage.load(sessionId);
 
     expect(loaded).not.toBeNull();
-    expect(loaded?.id).toBe('file-test-1');
+    expect(loaded?.id).toBe(sessionId);
     expect(loaded?.model).toBe('gpt-4o');
   });
 
   it('should return null for non-existent session', async () => {
-    const loaded = await storage.load('non-existent-file');
+    const nonExistentId = generateUUID();
+    const loaded = await storage.load(nonExistentId);
     expect(loaded).toBeNull();
   });
 
   it('should check if session exists', async () => {
+    const sessionId = generateUUID();
     const sessionData: SessionData = {
-      id: 'file-test-2',
+      id: sessionId,
       model: 'gpt-4o',
       provider: 'openai',
       createdAt: Date.now(),
@@ -221,14 +233,15 @@ describe('FileStorage', () => {
       options: { model: 'gpt-4o' },
     };
 
-    expect(await storage.exists('file-test-2')).toBe(false);
+    expect(await storage.exists(sessionId)).toBe(false);
     await storage.save(sessionData);
-    expect(await storage.exists('file-test-2')).toBe(true);
+    expect(await storage.exists(sessionId)).toBe(true);
   });
 
   it('should delete session file', async () => {
+    const sessionId = generateUUID();
     const sessionData: SessionData = {
-      id: 'file-test-3',
+      id: sessionId,
       model: 'gpt-4o',
       provider: 'openai',
       createdAt: Date.now(),
@@ -238,15 +251,15 @@ describe('FileStorage', () => {
     };
 
     await storage.save(sessionData);
-    expect(await storage.exists('file-test-3')).toBe(true);
+    expect(await storage.exists(sessionId)).toBe(true);
 
-    await storage.delete('file-test-3');
-    expect(await storage.exists('file-test-3')).toBe(false);
+    await storage.delete(sessionId);
+    expect(await storage.exists(sessionId)).toBe(false);
   });
 
-  it('should handle special characters in session ID', async () => {
+  it('should reject invalid session ID format', async () => {
     const sessionData: SessionData = {
-      id: 'test/session:with.special!chars',
+      id: 'invalid-session-id',  // Not UUID format
       model: 'gpt-4o',
       provider: 'openai',
       createdAt: Date.now(),
@@ -255,9 +268,10 @@ describe('FileStorage', () => {
       options: { model: 'gpt-4o' },
     };
 
-    await storage.save(sessionData);
-    // Should sanitize the ID
-    expect(await storage.exists('test/session:with.special!chars')).toBe(true);
+    // Should throw error for non-UUID format
+    expect(async () => {
+      await storage.save(sessionData);
+    }).toThrow('Invalid session ID format');
   });
 });
 
