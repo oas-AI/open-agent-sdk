@@ -209,3 +209,179 @@ describe('ReAct Loop', () => {
     expect(result.result).toBe('Done');
   });
 });
+
+describe('ReActLoop.runStream()', () => {
+  it('should yield assistant messages', async () => {
+    const registry = new ToolRegistry();
+    const mockProvider = new MockProvider({ apiKey: 'test', model: 'test' });
+
+    mockProvider.setResponses([
+      [
+        {
+          type: 'assistant',
+          content: 'Hello from assistant',
+        },
+      ],
+    ]);
+
+    const loop = new ReActLoop(mockProvider, registry, {
+      maxTurns: 5,
+    });
+
+    const events: { type: string }[] = [];
+    for await (const event of loop.runStream('Test prompt')) {
+      events.push({ type: event.type });
+    }
+
+    expect(events.some((e) => e.type === 'assistant')).toBe(true);
+    expect(events.some((e) => e.type === 'done')).toBe(true);
+  });
+
+  it('should yield tool_result messages', async () => {
+    const registry = new ToolRegistry();
+    registry.register(new ReadTool());
+
+    const mockProvider = new MockProvider({ apiKey: 'test', model: 'test' });
+
+    mockProvider.setResponses([
+      [
+        {
+          type: 'assistant',
+          content: '',
+          tool_calls: [
+            {
+              id: 'call_1',
+              type: 'function',
+              function: {
+                name: 'Read',
+                arguments: JSON.stringify({ file_path: '/nonexistent.txt' }),
+              },
+            },
+          ],
+        },
+      ],
+      [
+        {
+          type: 'assistant',
+          content: 'Done reading',
+        },
+      ],
+    ]);
+
+    const loop = new ReActLoop(mockProvider, registry, {
+      maxTurns: 5,
+    });
+
+    const events: { type: string }[] = [];
+    for await (const event of loop.runStream('Read a file')) {
+      events.push({ type: event.type });
+    }
+
+    expect(events.some((e) => e.type === 'assistant')).toBe(true);
+    expect(events.some((e) => e.type === 'tool_result')).toBe(true);
+    expect(events.some((e) => e.type === 'done')).toBe(true);
+  });
+
+  it('should yield usage stats', async () => {
+    const registry = new ToolRegistry();
+    const mockProvider = new MockProvider({ apiKey: 'test', model: 'test' });
+
+    mockProvider.setResponses([
+      [
+        {
+          type: 'assistant',
+          content: 'Response',
+        },
+      ],
+    ]);
+
+    const loop = new ReActLoop(mockProvider, registry, {
+      maxTurns: 5,
+    });
+
+    const events: { type: string; usage?: unknown }[] = [];
+    for await (const event of loop.runStream('Test')) {
+      events.push(event as { type: string; usage?: unknown });
+    }
+
+    const usageEvents = events.filter((e) => e.type === 'usage');
+    expect(usageEvents.length).toBeGreaterThan(0);
+    expect(usageEvents[0].usage).toEqual({
+      input_tokens: 10,
+      output_tokens: 5,
+    });
+  });
+
+  it('should yield done event with result', async () => {
+    const registry = new ToolRegistry();
+    const mockProvider = new MockProvider({ apiKey: 'test', model: 'test' });
+
+    mockProvider.setResponses([
+      [
+        {
+          type: 'assistant',
+          content: 'Final answer',
+        },
+      ],
+    ]);
+
+    const loop = new ReActLoop(mockProvider, registry, {
+      maxTurns: 5,
+    });
+
+    const events: { type: string; result?: string }[] = [];
+    for await (const event of loop.runStream('Test')) {
+      events.push(event as { type: string; result?: string });
+    }
+
+    const doneEvent = events.find((e) => e.type === 'done');
+    expect(doneEvent).toBeDefined();
+    expect(doneEvent?.result).toBe('Final answer');
+  });
+
+  it('should stream multiple turns', async () => {
+    const registry = new ToolRegistry();
+    registry.register(new ReadTool());
+
+    const mockProvider = new MockProvider({ apiKey: 'test', model: 'test' });
+
+    mockProvider.setResponses([
+      [
+        {
+          type: 'assistant',
+          content: 'First response',
+          tool_calls: [
+            {
+              id: 'call_1',
+              type: 'function',
+              function: {
+                name: 'Read',
+                arguments: '{}',
+              },
+            },
+          ],
+        },
+      ],
+      [
+        {
+          type: 'assistant',
+          content: 'Second response',
+        },
+      ],
+    ]);
+
+    const loop = new ReActLoop(mockProvider, registry, {
+      maxTurns: 5,
+    });
+
+    const events: { type: string }[] = [];
+    for await (const event of loop.runStream('Test')) {
+      events.push({ type: event.type });
+    }
+
+    const assistantEvents = events.filter((e) => e.type === 'assistant');
+    expect(assistantEvents.length).toBe(2);
+    const toolResultEvents = events.filter((e) => e.type === 'tool_result');
+    expect(toolResultEvents.length).toBe(1);
+  });
+});

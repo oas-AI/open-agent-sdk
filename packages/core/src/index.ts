@@ -165,7 +165,7 @@ export {
 } from './tools/registry';
 
 // Re-export agent
-export { ReActLoop, type ReActLoopConfig, type ReActResult } from './agent/react-loop';
+export { ReActLoop, type ReActLoopConfig, type ReActResult, type ReActStreamEvent } from './agent/react-loop';
 
 // Re-export message helpers
 export {
@@ -176,12 +176,19 @@ export {
   createResultMessage,
 } from './types/messages';
 
-// Re-export session storage
+// Re-export session
 export {
+  Session,
+  SessionState,
+  SessionError,
+  SessionNotIdleError,
+  SessionNotReadyError,
+  SessionAlreadyStreamingError,
+  SessionClosedError,
   InMemoryStorage,
   FileStorage,
   type SessionStorage,
   type SessionData,
-  type SessionOptions,
+  type SessionOptions as SessionStorageOptions,
   type FileStorageOptions,
-} from './session/storage';
+} from './session';

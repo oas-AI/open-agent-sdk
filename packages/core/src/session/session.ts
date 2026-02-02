@@ -1,0 +1,247 @@
+/**
+ * Session class for managing conversation state
+ * Provides a stateful interface for multi-turn interactions
+ */
+
+import type { ReActLoop } from '../agent/react-loop';
+import type { SDKMessage } from '../types/messages';
+
+/** Session states following a state machine pattern */
+export enum SessionState {
+  IDLE = 'idle',
+  READY = 'ready',
+  RUNNING = 'running',
+  ERROR = 'error',
+  CLOSED = 'closed',
+}
+
+/** Base error class for session-related errors */
+export class SessionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SessionError';
+  }
+}
+
+/** Error thrown when send() is called but session is not in IDLE state */
+export class SessionNotIdleError extends SessionError {
+  constructor() {
+    super('Cannot send message: session is not in idle state');
+    this.name = 'SessionNotIdleError';
+  }
+}
+
+/** Error thrown when stream() is called but session is not in READY state */
+export class SessionNotReadyError extends SessionError {
+  constructor() {
+    super('Cannot start stream: session is not in ready state. Call send() first.');
+    this.name = 'SessionNotReadyError';
+  }
+}
+
+/** Error thrown when stream() is called while another stream is active */
+export class SessionAlreadyStreamingError extends SessionError {
+  constructor() {
+    super('Cannot start stream: another stream is already active');
+    this.name = 'SessionAlreadyStreamingError';
+  }
+}
+
+/** Error thrown when any operation is called on a closed session */
+export class SessionClosedError extends SessionError {
+  constructor() {
+    super('Session is closed');
+    this.name = 'SessionClosedError';
+  }
+}
+
+/** Options for creating a new Session */
+export interface SessionOptions {
+  /** Model identifier */
+  model: string;
+  /** Provider name */
+  provider: string;
+  /** Optional session ID (generated if not provided) */
+  id?: string;
+}
+
+/** Generate a simple UUID v4 */
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/**
+ * Session class for managing conversation state
+ *
+ * State machine:
+ *   [idle] --send()--> [ready]
+ *     ▲                  │
+ *     │                  ▼
+ *   [closed]          [running] --stream结束--> [idle]
+ *                        │
+ *                        ▼
+ *                     [error] --> [idle]
+ *
+ * Constraints:
+ * - send() can only be called in IDLE state
+ * - stream() can only be called in READY state
+ * - Only one stream can be active at a time
+ * - close() can be called in any state
+ */
+export class Session {
+  readonly id: string;
+  readonly model: string;
+  readonly provider: string;
+  readonly createdAt: number;
+
+  private _state: SessionState;
+  private loop: ReActLoop;
+  private messages: SDKMessage[];
+  private isStreaming: boolean;
+
+  constructor(loop: ReActLoop, options: SessionOptions) {
+    this.id = options.id ?? generateUUID();
+    this.model = options.model;
+    this.provider = options.provider;
+    this.createdAt = Date.now();
+    this.loop = loop;
+    this.messages = [];
+    this._state = SessionState.IDLE;
+    this.isStreaming = false;
+  }
+
+  /** Current state of the session */
+  get state(): SessionState {
+    return this._state;
+  }
+
+  /**
+   * Send a user message to the session
+   * Transitions state from IDLE to READY
+   *
+   * @param message - User's message
+   * @throws {SessionNotIdleError} If session is not in IDLE state
+   * @throws {SessionClosedError} If session is closed
+   */
+  async send(message: string): Promise<void> {
+    if (this._state === SessionState.CLOSED) {
+      throw new SessionClosedError();
+    }
+
+    if (this._state !== SessionState.IDLE) {
+      throw new SessionNotIdleError();
+    }
+
+    // Create user message and add to history
+    const userMessage: SDKMessage = {
+      type: 'user',
+      uuid: generateUUID(),
+      session_id: this.id,
+      message: { role: 'user', content: message },
+      parent_tool_use_id: null,
+    };
+
+    this.messages.push(userMessage);
+    this._state = SessionState.READY;
+  }
+
+  /**
+   * Stream the agent's response
+   * Transitions state from READY to RUNNING, then back to IDLE
+   *
+   * @returns AsyncGenerator yielding SDK messages
+   * @throws {SessionNotReadyError} If session is not in READY state
+   * @throws {SessionAlreadyStreamingError} If another stream is active
+   * @throws {SessionClosedError} If session is closed
+   */
+  async *stream(): AsyncGenerator<SDKMessage> {
+    if (this._state === SessionState.CLOSED) {
+      throw new SessionClosedError();
+    }
+
+    if (this.isStreaming) {
+      throw new SessionAlreadyStreamingError();
+    }
+
+    if (this._state !== SessionState.READY) {
+      throw new SessionNotReadyError();
+    }
+
+    this._state = SessionState.RUNNING;
+    this.isStreaming = true;
+
+    try {
+      // Get the last user message
+      const lastUserMessage = this.messages[this.messages.length - 1];
+      if (lastUserMessage.type !== 'user') {
+        throw new SessionError('Expected last message to be from user');
+      }
+
+      const userPrompt = lastUserMessage.message.content;
+
+      // Run the ReAct loop and yield messages
+      for await (const event of this.loop.runStream(userPrompt)) {
+        switch (event.type) {
+          case 'assistant':
+            this.messages.push(event.message);
+            yield event.message;
+            break;
+
+          case 'tool_result':
+            this.messages.push(event.message);
+            yield event.message;
+            break;
+
+          case 'usage':
+            // Usage stats are tracked but not yielded as SDK messages
+            break;
+
+          case 'done':
+            // Stream completed
+            break;
+        }
+      }
+
+      this._state = SessionState.IDLE;
+    } catch (error) {
+      this._state = SessionState.ERROR;
+      throw error;
+    } finally {
+      this.isStreaming = false;
+
+      // If we were in ERROR state, transition back to IDLE for recovery
+      if (this._state === SessionState.ERROR) {
+        this._state = SessionState.IDLE;
+      }
+    }
+  }
+
+  /**
+   * Get a readonly copy of the message history
+   *
+   * @returns Readonly array of SDK messages
+   */
+  getMessages(): readonly SDKMessage[] {
+    return Object.freeze([...this.messages]);
+  }
+
+  /**
+   * Close the session
+   * Can be called from any state
+   */
+  async close(): Promise<void> {
+    this._state = SessionState.CLOSED;
+    this.isStreaming = false;
+  }
+
+  /**
+   * Support for async dispose pattern (await using)
+   */
+  async [Symbol.asyncDispose](): Promise<void> {
+    await this.close();
+  }
+}

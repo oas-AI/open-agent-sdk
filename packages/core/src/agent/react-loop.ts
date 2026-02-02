@@ -9,6 +9,7 @@ import type { Tool, ToolContext } from '../types/tools';
 import {
   type SDKMessage,
   type SDKAssistantMessage,
+  type SDKToolResultMessage,
   type ToolCall,
   type UUID,
   createUserMessage,
@@ -44,6 +45,13 @@ export interface ReActResult {
     output_tokens: number;
   };
 }
+
+/** Stream event types for ReActLoop.runStream() */
+export type ReActStreamEvent =
+  | { type: 'assistant'; message: SDKAssistantMessage }
+  | { type: 'tool_result'; message: SDKToolResultMessage }
+  | { type: 'usage'; usage: { input_tokens: number; output_tokens: number } }
+  | { type: 'done'; result: string };
 
 export class ReActLoop {
   private provider: LLMProvider;
@@ -183,6 +191,110 @@ export class ReActLoop {
         output_tokens: totalOutputTokens,
       },
     };
+  }
+
+  /**
+   * Run the ReAct loop with streaming output
+   * Yields events for assistant messages, tool results, usage stats, and completion
+   */
+  async *runStream(userPrompt: string): AsyncGenerator<ReActStreamEvent> {
+    const messages: SDKMessage[] = [];
+
+    // Add system prompt if provided
+    if (this.config.systemPrompt) {
+      messages.push(
+        createSystemMessage(
+          'default',
+          this.provider.constructor.name.toLowerCase().replace('provider', ''),
+          this.config.allowedTools ?? this.toolRegistry.getAll().map((t) => t.name),
+          this.sessionId,
+          generateUUID()
+        )
+      );
+    }
+
+    // Add user message
+    messages.push(createUserMessage(userPrompt, this.sessionId, generateUUID()));
+
+    let turnCount = 0;
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+
+    // Get allowed tools
+    const availableTools = this.config.allowedTools
+      ? this.toolRegistry.getAllowedTools(this.config.allowedTools)
+      : this.toolRegistry.getAll();
+
+    const toolDefinitions = availableTools.map((tool) => ({
+      type: 'function' as const,
+      function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.parameters,
+      },
+    }));
+
+    const toolContext: ToolContext = {
+      cwd: this.config.cwd!,
+      env: this.config.env!,
+      abortController: this.config.abortController,
+    };
+
+    while (turnCount < this.config.maxTurns) {
+      // Check for abort
+      if (this.config.abortController?.signal.aborted) {
+        yield {
+          type: 'done',
+          result: 'Operation aborted',
+        };
+        return;
+      }
+
+      turnCount++;
+
+      // Call LLM
+      const assistantMessage = await this.callLLM(
+        messages,
+        toolDefinitions,
+        (tokens) => {
+          totalInputTokens += tokens.input;
+          totalOutputTokens += tokens.output;
+        }
+      );
+
+      messages.push(assistantMessage);
+      yield { type: 'assistant', message: assistantMessage };
+
+      // Check if assistant wants to use tools
+      const assistantToolCalls = assistantMessage.message.tool_calls;
+      if (assistantToolCalls && assistantToolCalls.length > 0) {
+        // Execute tools and add results
+        for (const toolCall of assistantToolCalls) {
+          const result = await this.executeTool(toolCall, availableTools, toolContext);
+          const toolResultMessage = createToolResultMessage(
+            toolCall.id,
+            toolCall.function.name,
+            result.content,
+            result.isError,
+            this.sessionId,
+            generateUUID()
+          );
+          messages.push(toolResultMessage);
+          yield { type: 'tool_result', message: toolResultMessage };
+        }
+      } else {
+        // No tool calls - we have the final answer
+        const textContent = assistantMessage.message.content.find((c) => c.type === 'text');
+        const result = textContent?.text ?? '';
+        yield { type: 'usage', usage: { input_tokens: totalInputTokens, output_tokens: totalOutputTokens } };
+        yield { type: 'done', result };
+        return;
+      }
+    }
+
+    // Max turns reached
+    yield { type: 'usage', usage: { input_tokens: totalInputTokens, output_tokens: totalOutputTokens } };
+    yield { type: 'done', result: 'Maximum turns reached without completion' };
   }
 
   private async callLLM(
