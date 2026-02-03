@@ -3,8 +3,7 @@
  * Single-query prompt function for one-shot agent interactions
  */
 
-console.log('[OpenAgentSDK] Core module loaded - v0.1.0-debug');
-
+import { logger, type LogLevel } from './utils/logger';
 import { OpenAIProvider } from './providers/openai';
 import { GoogleProvider } from './providers/google';
 import { createDefaultRegistry } from './tools/registry';
@@ -36,6 +35,8 @@ export interface PromptOptions {
   permissionMode?: 'accept' | 'reject' | 'prompt';
   /** MCP servers configuration */
   mcpServers?: Record<string, unknown>;
+  /** Log level: 'debug' | 'info' | 'warn' | 'error' | 'silent' (default: 'info') */
+  logLevel?: LogLevel;
 }
 
 export interface PromptResult {
@@ -69,6 +70,12 @@ export async function prompt(
   prompt: string,
   options: PromptOptions
 ): Promise<PromptResult> {
+  // Set log level from options or environment variable
+  const logLevel = options.logLevel ??
+    (process.env.OPEN_AGENT_SDK_LOG_LEVEL as LogLevel) ??
+    'info';
+  logger.setLevel(logLevel);
+
   const startTime = Date.now();
 
   // Auto-detect provider from model name if not specified
@@ -208,3 +215,6 @@ export {
   type CreateSessionOptions,
   type ResumeSessionOptions,
 } from './session';
+
+// Re-export logger
+export { logger, type LogLevel } from './utils/logger';

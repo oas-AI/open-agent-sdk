@@ -6,6 +6,7 @@
 import type { LLMProvider, ChatOptions } from '../providers/base';
 import type { ToolRegistry } from '../tools/registry';
 import type { Tool, ToolContext } from '../types/tools';
+import { logger } from '../utils/logger';
 import {
   type SDKMessage,
   type SDKAssistantMessage,
@@ -239,8 +240,8 @@ export class ReActLoop {
       // Add current user message
       createUserMessage(userPrompt, this.sessionId, generateUUID()),
     ];
-    console.log('[ReActLoop] Total messages:', messages.length);
-    console.log('[ReActLoop] Messages:', JSON.stringify(messages, null, 2));
+    logger.debug('[ReActLoop] Total messages:', messages.length);
+    logger.debug('[ReActLoop] Messages:', JSON.stringify(messages, null, 2));
 
     let turnCount = 0;
     let totalInputTokens = 0;

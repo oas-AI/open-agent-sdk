@@ -6,6 +6,7 @@ import { GoogleGenAI, type Content, type Part, type Schema } from '@google/genai
 import { LLMProvider, type LLMChunk, type ChatOptions } from './base';
 import type { SDKMessage } from '../types/messages';
 import type { ToolDefinition } from '../types/tools';
+import { logger } from '../utils/logger';
 
 export interface GoogleConfig {
   apiKey: string;
@@ -35,7 +36,7 @@ export class GoogleProvider extends LLMProvider {
     options?: ChatOptions
   ): AsyncIterable<LLMChunk> {
     try {
-      console.log('[GoogleProvider] Received messages:', messages.length);
+      logger.debug('[GoogleProvider] Received messages:', messages.length);
 
       // System instruction comes from options, not from SDKSystemMessage
       const systemInstruction = options?.systemInstruction;
@@ -47,13 +48,13 @@ export class GoogleProvider extends LLMProvider {
           continue;
         }
         const content = this.convertMessage(msg);
-        console.log(`[GoogleProvider] Converted ${msg.type}:`, content);
+        logger.debug(`[GoogleProvider] Converted ${msg.type}:`, content);
         if (content) {
           history.push(content);
         }
       }
 
-      console.log('[GoogleProvider] Converted history:', JSON.stringify(history, null, 2));
+      logger.debug('[GoogleProvider] Converted history:', JSON.stringify(history, null, 2));
 
     // Convert tools to Google format
     const googleTools = tools?.map((tool) => ({
@@ -143,7 +144,7 @@ export class GoogleProvider extends LLMProvider {
 
     yield { type: 'done' };
     } catch (error) {
-      console.error('[GoogleProvider] Error:', error);
+      logger.error('[GoogleProvider] Error:', error);
       yield {
         type: 'content',
         delta: `Error: ${error instanceof Error ? error.message : String(error)}`,

@@ -6,6 +6,7 @@
 import type { ReActLoop } from '../agent/react-loop';
 import type { SDKMessage } from '../types/messages';
 import type { SessionStorage, SessionData } from './storage';
+import { logger } from '../utils/logger';
 
 /** Session states following a state machine pattern */
 export enum SessionState {
@@ -249,8 +250,8 @@ export class Session {
 
       // Pass history messages (excluding the current user message which will be added by runStream)
       const historyMessages = this.messages.slice(0, -1);
-      console.log('[Session] historyMessages count:', historyMessages.length);
-      console.log('[Session] historyMessages:', JSON.stringify(historyMessages, null, 2));
+      logger.debug('[Session] historyMessages count:', historyMessages.length);
+      logger.debug('[Session] historyMessages:', JSON.stringify(historyMessages, null, 2));
 
       // Run the ReAct loop and yield messages
       for await (const event of this.loop.runStream(userPrompt, historyMessages)) {

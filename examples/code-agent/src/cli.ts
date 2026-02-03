@@ -70,6 +70,7 @@ export class CLI {
         provider: 'google',
         apiKey,
         maxTurns: 10,
+        logLevel: 'silent',
         systemPrompt: `You are a helpful code assistant with access to file and shell tools.
 
 Available tools:

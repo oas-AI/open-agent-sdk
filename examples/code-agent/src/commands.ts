@@ -92,6 +92,7 @@ registerCommand('/load', async (args, context) => {
     const session = await resumeSession(sessionId, {
       storage: context.storage,
       apiKey,
+      logLevel: 'silent',
     });
 
     context.setSession(session);

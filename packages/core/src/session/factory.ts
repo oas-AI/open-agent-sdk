@@ -9,6 +9,7 @@ import { createDefaultRegistry } from '../tools/registry';
 import { ReActLoop } from '../agent/react-loop';
 import { Session } from './session';
 import { InMemoryStorage, type SessionStorage, type SessionData } from './storage';
+import { logger, type LogLevel } from '../utils/logger';
 
 /** Options for creating a new session */
 export interface CreateSessionOptions {
@@ -36,6 +37,8 @@ export interface CreateSessionOptions {
   permissionMode?: 'accept' | 'reject' | 'prompt';
   /** MCP servers configuration */
   mcpServers?: Record<string, unknown>;
+  /** Log level: 'debug' | 'info' | 'warn' | 'error' | 'silent' (default: 'info') */
+  logLevel?: LogLevel;
 }
 
 /** Options for resuming an existing session */
@@ -44,6 +47,8 @@ export interface ResumeSessionOptions {
   storage?: SessionStorage;
   /** API key override (optional) */
   apiKey?: string;
+  /** Log level: 'debug' | 'info' | 'warn' | 'error' | 'silent' (default: 'info') */
+  logLevel?: LogLevel;
 }
 
 /**
@@ -70,6 +75,12 @@ export interface ResumeSessionOptions {
  * ```
  */
 export async function createSession(options: CreateSessionOptions): Promise<Session> {
+  // Set log level from options or environment variable
+  const logLevel = options.logLevel ??
+    (process.env.OPEN_AGENT_SDK_LOG_LEVEL as LogLevel) ??
+    'info';
+  logger.setLevel(logLevel);
+
   // Auto-detect provider from model name if not specified
   const providerType = options.provider ??
     (options.model.toLowerCase().includes('gemini') ? 'google' : 'openai');
@@ -169,6 +180,12 @@ export async function resumeSession(
   sessionId: string,
   options?: ResumeSessionOptions
 ): Promise<Session> {
+  // Set log level from options or environment variable
+  const logLevel = options?.logLevel ??
+    (process.env.OPEN_AGENT_SDK_LOG_LEVEL as LogLevel) ??
+    'info';
+  logger.setLevel(logLevel);
+
   // Get storage (default to InMemoryStorage)
   const storage = options?.storage ?? new InMemoryStorage();
 
