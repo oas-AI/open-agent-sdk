@@ -9,6 +9,7 @@ import type { Tool, ToolContext, JSONSchema } from '../types/tools';
 export interface GlobInput {
   pattern: string;
   path?: string;
+  sort?: 'alphabetical' | 'mtime';
 }
 
 export interface GlobOutput {
@@ -27,6 +28,11 @@ const parameters: JSONSchema = {
     path: {
       type: 'string',
       description: 'Directory to search in (defaults to cwd)',
+    },
+    sort: {
+      type: 'string',
+      enum: ['alphabetical', 'mtime'],
+      description: 'Sort order: alphabetical (default) or mtime (modification time, newest first)',
     },
   },
   required: ['pattern'],
@@ -168,6 +174,11 @@ function matchGlob(filePath: string, pattern: string): boolean {
   return regex.test(normalizedPath);
 }
 
+interface FileResult {
+  path: string;
+  mtime: number;
+}
+
 /**
  * Recursively find files matching the pattern
  */
@@ -175,7 +186,7 @@ function findFiles(
   dir: string,
   pattern: string,
   baseDir: string,
-  results: string[],
+  results: FileResult[],
   visited: Set<string> = new Set()
 ): void {
   if (results.length >= MAX_RESULTS) {
@@ -207,7 +218,10 @@ function findFiles(
       } else if (stats.isFile()) {
         // Check if file matches pattern
         if (matchGlob(relativePath, pattern)) {
-          results.push(fullPath);
+          results.push({
+            path: fullPath,
+            mtime: stats.mtime.getTime(),
+          });
         }
       }
     }
@@ -255,14 +269,21 @@ export class GlobTool implements Tool<GlobInput, GlobOutput> {
       }
 
       // Find matching files
-      const results: string[] = [];
+      const results: FileResult[] = [];
       findFiles(searchDir, input.pattern, searchDir, results);
 
-      // Sort results alphabetically
-      results.sort();
+      // Sort results
+      const sortMode = input.sort ?? 'alphabetical';
+      if (sortMode === 'mtime') {
+        // Sort by modification time desc (newest first)
+        results.sort((a, b) => b.mtime - a.mtime);
+      } else {
+        // Sort alphabetically
+        results.sort((a, b) => a.path.localeCompare(b.path));
+      }
 
       return {
-        files: results,
+        files: results.map((r) => r.path),
         count: results.length,
       };
     } catch (error) {

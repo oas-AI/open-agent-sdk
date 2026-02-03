@@ -208,4 +208,179 @@ describe('Grep Tool', () => {
     expect(files).toContain(join(tempDir, 'file1.ts'));
     expect(files).toContain(join(tempDir, 'file2.ts'));
   });
+
+  describe('output_mode', () => {
+    it('should return only file paths when output_mode is files_with_matches', async () => {
+      writeFileSync(join(tempDir, 'file1.ts'), 'function a() {}\nfunction b() {}');
+      writeFileSync(join(tempDir, 'file2.ts'), 'function c() {}');
+      writeFileSync(join(tempDir, 'file3.ts'), 'const x = 1;');
+
+      const tool = new GrepTool();
+      const result = await tool.handler(
+        { pattern: 'function', output_mode: 'files_with_matches' },
+        context
+      );
+
+      expect(result.error).toBeUndefined();
+      expect(result.files).toHaveLength(2);
+      expect(result.files).toContain(join(tempDir, 'file1.ts'));
+      expect(result.files).toContain(join(tempDir, 'file2.ts'));
+      expect(result.matches).toBeUndefined();
+      expect(result.count).toBeUndefined();
+    });
+
+    it('should return count per file when output_mode is count', async () => {
+      writeFileSync(join(tempDir, 'file1.ts'), 'function a() {}\nfunction b() {}');
+      writeFileSync(join(tempDir, 'file2.ts'), 'function c() {}');
+
+      const tool = new GrepTool();
+      const result = await tool.handler(
+        { pattern: 'function', output_mode: 'count' },
+        context
+      );
+
+      expect(result.error).toBeUndefined();
+      expect(result.fileCounts).toBeDefined();
+      expect(result.fileCounts![join(tempDir, 'file1.ts')]).toBe(2);
+      expect(result.fileCounts![join(tempDir, 'file2.ts')]).toBe(1);
+      expect(result.matches).toBeUndefined();
+      expect(result.count).toBeUndefined();
+    });
+
+    it('should return content matches when output_mode is content (default)', async () => {
+      writeFileSync(join(tempDir, 'file.ts'), 'function test() {}');
+
+      const tool = new GrepTool();
+      const result = await tool.handler(
+        { pattern: 'function', output_mode: 'content' },
+        context
+      );
+
+      expect(result.error).toBeUndefined();
+      expect(result.matches).toHaveLength(1);
+      expect(result.count).toBe(1);
+      expect(result.files).toBeUndefined();
+      expect(result.fileCounts).toBeUndefined();
+    });
+
+    it('should default to content mode when output_mode is not specified', async () => {
+      writeFileSync(join(tempDir, 'file.ts'), 'function test() {}');
+
+      const tool = new GrepTool();
+      const result = await tool.handler({ pattern: 'function' }, context);
+
+      expect(result.error).toBeUndefined();
+      expect(result.matches).toHaveLength(1);
+      expect(result.count).toBe(1);
+    });
+  });
+
+  describe('head_limit', () => {
+    it('should limit results to head_limit count', async () => {
+      const lines = Array(150).fill('function test() {}');
+      writeFileSync(join(tempDir, 'test.ts'), lines.join('\n'));
+
+      const tool = new GrepTool();
+      const result = await tool.handler(
+        { pattern: 'function', head_limit: 10 },
+        context
+      );
+
+      expect(result.matches).toHaveLength(10);
+      expect(result.count).toBe(10);
+    });
+
+    it('should default to 100 when head_limit not specified', async () => {
+      const lines = Array(150).fill('function test() {}');
+      writeFileSync(join(tempDir, 'test.ts'), lines.join('\n'));
+
+      const tool = new GrepTool();
+      const result = await tool.handler({ pattern: 'function' }, context);
+
+      expect(result.matches!.length).toBe(100);
+      expect(result.count).toBe(100);
+    });
+  });
+
+  describe('offset', () => {
+    it('should skip first N matches when offset is specified', async () => {
+      const lines = Array(10).fill('function test() {}');
+      writeFileSync(join(tempDir, 'test.ts'), lines.join('\n'));
+
+      const tool = new GrepTool();
+      const result = await tool.handler(
+        { pattern: 'function', head_limit: 5, offset: 5 },
+        context
+      );
+
+      expect(result.matches).toHaveLength(5);
+      expect(result.matches![0].line).toBe(6);
+      expect(result.matches![4].line).toBe(10);
+    });
+
+    it('should return empty when offset exceeds total matches', async () => {
+      writeFileSync(join(tempDir, 'test.ts'), 'function test() {}');
+
+      const tool = new GrepTool();
+      const result = await tool.handler(
+        { pattern: 'function', offset: 10 },
+        context
+      );
+
+      expect(result.matches).toHaveLength(0);
+      expect(result.count).toBe(0);
+    });
+  });
+
+  describe('context lines', () => {
+    it('should include context lines with -C option', async () => {
+      writeFileSync(
+        join(tempDir, 'test.ts'),
+        'line 1\nline 2\nfunction test() {}\nline 4\nline 5'
+      );
+
+      const tool = new GrepTool();
+      const result = await tool.handler(
+        { pattern: 'function', context: 2 },
+        context
+      );
+
+      expect(result.matches).toHaveLength(1);
+      expect(result.matches![0].content).toContain('function test() {}');
+      expect(result.matches![0].context_before).toEqual(['line 1', 'line 2']);
+      expect(result.matches![0].context_after).toEqual(['line 4', 'line 5']);
+    });
+
+    it('should support separate -B (before) option', async () => {
+      writeFileSync(
+        join(tempDir, 'test.ts'),
+        'line 1\nline 2\nfunction test() {}\nline 4'
+      );
+
+      const tool = new GrepTool();
+      const result = await tool.handler(
+        { pattern: 'function', before_context: 2 },
+        context
+      );
+
+      expect(result.matches![0].context_before).toEqual(['line 1', 'line 2']);
+      expect(result.matches![0].context_after).toBeUndefined();
+    });
+
+    it('should support separate -A (after) option', async () => {
+      writeFileSync(
+        join(tempDir, 'test.ts'),
+        'line 1\nfunction test() {}\nline 3\nline 4'
+      );
+
+      const tool = new GrepTool();
+      const result = await tool.handler(
+        { pattern: 'function', after_context: 2 },
+        context
+      );
+
+      expect(result.matches![0].context_before).toBeUndefined();
+      expect(result.matches![0].context_after).toEqual(['line 3', 'line 4']);
+    });
+  });
 });

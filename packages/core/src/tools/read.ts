@@ -27,7 +27,7 @@ const parameters: JSONSchema = {
   properties: {
     file_path: {
       type: 'string',
-      description: 'Absolute or relative file path to read',
+      description: 'Absolute path to the file to read',
     },
     offset: {
       type: 'number',
