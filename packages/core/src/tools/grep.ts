@@ -12,17 +12,27 @@ export interface GrepInput {
   glob?: string;
   multiline?: boolean;
   ignoreCase?: boolean;
+  output_mode?: 'files_with_matches' | 'content' | 'count';
+  head_limit?: number;
+  offset?: number;
+  context?: number;
+  before_context?: number;
+  after_context?: number;
 }
 
 export interface GrepMatch {
   file: string;
   line: number;
   content: string;
+  context_before?: string[];
+  context_after?: string[];
 }
 
 export interface GrepOutput {
   matches?: GrepMatch[];
   count?: number;
+  files?: string[];
+  fileCounts?: Record<string, number>;
   error?: string;
 }
 
@@ -48,6 +58,31 @@ const parameters: JSONSchema = {
     ignoreCase: {
       type: 'boolean',
       description: 'Case insensitive matching (default: false)',
+    },
+    output_mode: {
+      type: 'string',
+      enum: ['files_with_matches', 'content', 'count'],
+      description: 'Output format: files_with_matches (file paths only), content (matching lines), count (match counts per file)',
+    },
+    head_limit: {
+      type: 'number',
+      description: 'Maximum number of matches to return (default: 100)',
+    },
+    offset: {
+      type: 'number',
+      description: 'Number of matches to skip from the beginning',
+    },
+    context: {
+      type: 'number',
+      description: 'Number of context lines to show before and after each match (like -C in grep)',
+    },
+    before_context: {
+      type: 'number',
+      description: 'Number of context lines to show before each match (like -B in grep)',
+    },
+    after_context: {
+      type: 'number',
+      description: 'Number of context lines to show after each match (like -A in grep)',
     },
   },
   required: ['pattern'],
@@ -100,14 +135,24 @@ function matchSimpleGlob(path: string, pattern: string): boolean {
   return re.test(path);
 }
 
+interface FileMatchResult {
+  filePath: string;
+  line: number;
+  content: string;
+  context_before?: string[];
+  context_after?: string[];
+}
+
 /**
  * Search a single file for pattern matches
  */
 function searchFile(
   filePath: string,
   regex: RegExp,
-  matches: GrepMatch[],
-  maxMatches: number
+  matches: FileMatchResult[],
+  maxMatches: number,
+  beforeContext: number,
+  afterContext: number
 ): void {
   if (matches.length >= maxMatches) {
     return;
@@ -128,6 +173,8 @@ function searchFile(
       return; // Skip binary files
     }
 
+    const lines = content.split('\n');
+
     if (regex.multiline) {
       // Multiline mode: search entire content
       const text = content;
@@ -140,11 +187,23 @@ function searchFile(
         const lineNum = linesBefore.length;
         const lineContent = linesBefore[linesBefore.length - 1] + text.slice(match.index).split('\n')[0];
 
-        matches.push({
-          file: filePath,
+        const result: FileMatchResult = {
+          filePath,
           line: lineNum,
           content: lineContent.slice(0, 200), // Limit content length
-        });
+        };
+
+        // Add context if requested
+        if (beforeContext > 0) {
+          const startLine = Math.max(0, lineNum - beforeContext - 1);
+          result.context_before = lines.slice(startLine, lineNum - 1);
+        }
+        if (afterContext > 0) {
+          const endLine = Math.min(lines.length, lineNum + afterContext);
+          result.context_after = lines.slice(lineNum, endLine);
+        }
+
+        matches.push(result);
 
         // Prevent infinite loop on zero-length matches
         if (match[0].length === 0) {
@@ -153,18 +212,28 @@ function searchFile(
       }
     } else {
       // Line-by-line mode
-      const lines = content.split('\n');
-
       for (let i = 0; i < lines.length && matches.length < maxMatches; i++) {
         const line = lines[i];
         regex.lastIndex = 0;
 
         if (regex.test(line)) {
-          matches.push({
-            file: filePath,
+          const result: FileMatchResult = {
+            filePath,
             line: i + 1,
             content: line.slice(0, 200), // Limit content length
-          });
+          };
+
+          // Add context if requested
+          if (beforeContext > 0) {
+            const startLine = Math.max(0, i - beforeContext);
+            result.context_before = lines.slice(startLine, i);
+          }
+          if (afterContext > 0) {
+            const endLine = Math.min(lines.length, i + 1 + afterContext);
+            result.context_after = lines.slice(i + 1, endLine);
+          }
+
+          matches.push(result);
         }
       }
     }
@@ -182,8 +251,10 @@ function findAndSearch(
   glob: string | undefined,
   regex: RegExp,
   baseDir: string,
-  matches: GrepMatch[],
+  matches: FileMatchResult[],
   maxMatches: number,
+  beforeContext: number,
+  afterContext: number,
   visited: Set<string> = new Set()
 ): void {
   if (matches.length >= maxMatches) {
@@ -225,6 +296,8 @@ function findAndSearch(
             baseDir,
             matches,
             maxMatches,
+            beforeContext,
+            afterContext,
             visited
           );
         } else if (stats.isFile()) {
@@ -234,7 +307,7 @@ function findAndSearch(
           }
 
           // Search the file
-          searchFile(fullPath, regex, matches, maxMatches);
+          searchFile(fullPath, regex, matches, maxMatches, beforeContext, afterContext);
         }
       } catch {
         // Skip entries we can't stat
@@ -285,8 +358,18 @@ export class GrepTool implements Tool<GrepInput, GrepOutput> {
         return { error: `Invalid regex pattern: ${message}` };
       }
 
+      // Determine output mode
+      const outputMode = input.output_mode ?? 'content';
+
+      // Determine max matches (for content mode)
+      const maxMatches = input.head_limit ?? MAX_MATCHES;
+
+      // Determine context lines
+      const beforeContext = input.before_context ?? input.context ?? 0;
+      const afterContext = input.after_context ?? input.context ?? 0;
+
       // Find and search files
-      const matches: GrepMatch[] = [];
+      const matches: FileMatchResult[] = [];
       findAndSearch(
         searchDir,
         input.pattern,
@@ -294,13 +377,43 @@ export class GrepTool implements Tool<GrepInput, GrepOutput> {
         regex,
         searchDir,
         matches,
-        MAX_MATCHES
+        outputMode === 'content' ? maxMatches + (input.offset ?? 0) : Infinity,
+        beforeContext,
+        afterContext
       );
 
-      return {
-        matches,
-        count: matches.length,
-      };
+      // Apply offset
+      const offset = input.offset ?? 0;
+      const offsetMatches = matches.slice(offset);
+
+      // Format output based on mode
+      switch (outputMode) {
+        case 'files_with_matches': {
+          const files = [...new Set(offsetMatches.map((m) => m.filePath))];
+          return { files };
+        }
+        case 'count': {
+          const fileCounts: Record<string, number> = {};
+          for (const match of offsetMatches) {
+            fileCounts[match.filePath] = (fileCounts[match.filePath] ?? 0) + 1;
+          }
+          return { fileCounts };
+        }
+        case 'content':
+        default: {
+          const limitedMatches = offsetMatches.slice(0, maxMatches);
+          return {
+            matches: limitedMatches.map((m) => ({
+              file: m.filePath,
+              line: m.line,
+              content: m.content,
+              context_before: m.context_before,
+              context_after: m.context_after,
+            })),
+            count: limitedMatches.length,
+          };
+        }
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return { error: `Grep error: ${message}` };

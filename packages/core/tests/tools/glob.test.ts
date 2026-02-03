@@ -92,6 +92,30 @@ describe('Glob Tool', () => {
     ]);
   });
 
+  it('should return results sorted by modification time desc', async () => {
+    const file1 = join(tempDir, 'oldest.ts');
+    const file2 = join(tempDir, 'middle.ts');
+    const file3 = join(tempDir, 'newest.ts');
+
+    writeFileSync(file1, '');
+    // Small delay to ensure different mtime
+    await new Promise((r) => setTimeout(r, 50));
+    writeFileSync(file2, '');
+    await new Promise((r) => setTimeout(r, 50));
+    writeFileSync(file3, '');
+
+    const tool = new GlobTool();
+    const result = await tool.handler(
+      { pattern: '*.ts', sort: 'mtime' },
+      context
+    );
+
+    // Should be sorted by mtime desc (newest first)
+    expect(result.files[0]).toBe(file3);
+    expect(result.files[1]).toBe(file2);
+    expect(result.files[2]).toBe(file1);
+  });
+
   it('should support * wildcard for single directory', async () => {
     mkdirSync(join(tempDir, 'src'));
     writeFileSync(join(tempDir, 'src', 'file.ts'), '');
