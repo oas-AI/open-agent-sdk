@@ -3,6 +3,7 @@
  */
 
 import readline from 'readline';
+import chalk from 'chalk';
 import type { SDKMessage, SDKAssistantMessage, SDKToolResultMessage } from '@open-agent-sdk/core';
 import { Session, createSession, FileStorage } from '@open-agent-sdk/core';
 import {
@@ -11,11 +12,14 @@ import {
   printUserPrompt,
   printAssistantPrefix,
   printToolCall,
+  printToolResult,
+  formatToolResult,
   printSuccess,
   printError,
   printGoodbye,
   isCommand,
   parseCommand,
+  Spinner,
 } from './utils.js';
 import { executeCommand } from './commands.js';
 
@@ -26,6 +30,8 @@ export class CLI {
   private storage: FileStorage;
   private abortController: AbortController | null = null;
   private isRunning = false;
+  private spinner: Spinner;
+  private toolStartTimes: Map<string, number> = new Map();
 
   constructor() {
     this.rl = readline.createInterface({
@@ -35,6 +41,9 @@ export class CLI {
 
     // Use file storage for persistence
     this.storage = new FileStorage();
+
+    // Initialize spinner
+    this.spinner = new Spinner('Calling API...');
 
     // Handle Ctrl+C
     this.rl.on('SIGINT', () => {
@@ -153,14 +162,23 @@ Be concise but thorough in your responses.`,
       printAssistantPrefix();
       console.log();
 
-      let currentToolCalls = 0;
+      // Start spinner for API call
+      let hasReceivedContent = false;
+      this.spinner.start();
 
       for await (const sdkMessage of this.session.stream()) {
         // Check if aborted
         if (this.abortController?.signal.aborted) {
+          this.spinner.stop();
           console.log();
           printInfo('Request cancelled');
           break;
+        }
+
+        // Stop spinner once we receive content
+        if (!hasReceivedContent) {
+          this.spinner.stop();
+          hasReceivedContent = true;
         }
 
         this.renderMessage(sdkMessage);
@@ -168,6 +186,7 @@ Be concise but thorough in your responses.`,
 
       console.log();
     } catch (error) {
+      this.spinner.stop();
       if (error instanceof Error && error.name === 'AbortError') {
         console.log();
         printInfo('Request cancelled');
@@ -199,8 +218,11 @@ Be concise but thorough in your responses.`,
             try {
               const args = JSON.parse(toolCall.function.arguments);
               printToolCall(toolCall.function.name, args);
+              // Record start time for this tool
+              this.toolStartTimes.set(toolCall.id, Date.now());
             } catch {
               printToolCall(toolCall.function.name, { args: toolCall.function.arguments });
+              this.toolStartTimes.set(toolCall.id, Date.now());
             }
           }
         }
@@ -209,33 +231,18 @@ Be concise but thorough in your responses.`,
 
       case 'tool_result': {
         const toolMsg = message as SDKToolResultMessage;
-        const indicator = toolMsg.is_error ? '✗' : '✓';
-        const color = toolMsg.is_error ? '\x1b[31m' : '\x1b[32m';
-        const reset = '\x1b[0m';
-        console.log();
-        console.log(`${color}${indicator} Tool result: ${toolMsg.tool_name}${reset}`);
+        const startTime = this.toolStartTimes.get(toolMsg.tool_use_id);
+        const duration = startTime ? (Date.now() - startTime) / 1000 : undefined;
 
-        // Try to format the output nicely
-        try {
-          const result = toolMsg.result;
-          if (typeof result === 'object' && result !== null) {
-            // For object results, show key info
-            const resultObj = result as Record<string, unknown>;
-            if (resultObj.content !== undefined) {
-              console.log(`  ${String(resultObj.content).slice(0, 200)}${String(resultObj.content).length > 200 ? '...' : ''}`);
-            } else if (resultObj.files !== undefined) {
-              console.log(`  Files: ${(resultObj.files as unknown[]).length}`);
-            } else if (resultObj.matches !== undefined) {
-              console.log(`  Matches: ${(resultObj.matches as unknown[]).length}`);
-            } else {
-              console.log(`  ${JSON.stringify(result).slice(0, 200)}...`);
-            }
-          } else {
-            console.log(`  ${String(result).slice(0, 200)}${String(result).length > 200 ? '...' : ''}`);
-          }
-        } catch {
-          console.log(`  ${String(toolMsg.result).slice(0, 200)}${String(toolMsg.result).length > 200 ? '...' : ''}`);
-        }
+        console.log();
+        printToolResult(toolMsg.tool_name, toolMsg.is_error, duration);
+
+        // Format and display result
+        const formatted = formatToolResult(toolMsg.result);
+        console.log(`  ${chalk.gray(formatted)}`);
+
+        // Clean up start time
+        this.toolStartTimes.delete(toolMsg.tool_use_id);
         break;
       }
     }
