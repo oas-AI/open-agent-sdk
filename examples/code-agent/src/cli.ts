@@ -95,7 +95,7 @@ When using tools:
 5. For web searches, use WebSearch to find relevant information
 6. For analyzing specific webpages, use WebFetch with a clear prompt
 
-Be concise but thorough in your responses.`
+Be concise but thorough in your responses.`,
         storage: this.storage,
       });
 
