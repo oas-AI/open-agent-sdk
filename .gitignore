@@ -43,3 +43,6 @@ docs/dev/
 # Legacy files
 claude-agent-sdk-ts*
 REQUIREMENTS.md
+
+# Worktrees
+.worktrees/
