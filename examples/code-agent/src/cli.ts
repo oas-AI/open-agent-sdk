@@ -11,9 +11,6 @@ import {
   printHelp,
   printUserPrompt,
   printAssistantPrefix,
-  printToolCall,
-  printToolResult,
-  formatToolResult,
   printSuccess,
   printError,
   printGoodbye,
@@ -22,6 +19,7 @@ import {
   Spinner,
 } from './utils.js';
 import { executeCommand } from './commands.js';
+import { ToolManager, TerminalRenderer } from './utils/index.js';
 
 /** CLI class managing the interactive session */
 export class CLI {
@@ -31,7 +29,9 @@ export class CLI {
   private abortController: AbortController | null = null;
   private isRunning = false;
   private spinner: Spinner;
-  private toolStartTimes: Map<string, number> = new Map();
+  private toolManager: ToolManager;
+  private terminalRenderer: TerminalRenderer;
+  private hasDisplayedTools = false;
 
   constructor() {
     this.rl = readline.createInterface({
@@ -44,6 +44,10 @@ export class CLI {
 
     // Initialize spinner
     this.spinner = new Spinner('Calling API...');
+
+    // Initialize tool manager and renderer
+    this.toolManager = new ToolManager();
+    this.terminalRenderer = new TerminalRenderer();
 
     // Handle Ctrl+C
     this.rl.on('SIGINT', () => {
@@ -152,6 +156,10 @@ Be concise but thorough in your responses.`,
       return;
     }
 
+    // Clear previous tool state for new message
+    this.toolManager.clear();
+    this.hasDisplayedTools = false;
+
     // Create abort controller for this request
     this.abortController = new AbortController();
 
@@ -205,6 +213,13 @@ Be concise but thorough in your responses.`,
     switch (message.type) {
       case 'assistant': {
         const assistantMsg = message as SDKAssistantMessage;
+
+        // Clear tool display before showing assistant text
+        if (this.hasDisplayedTools) {
+          this.terminalRenderer.clear();
+          this.hasDisplayedTools = false;
+        }
+
         // Render text content
         for (const content of assistantMsg.message.content) {
           if (content.type === 'text') {
@@ -212,38 +227,41 @@ Be concise but thorough in your responses.`,
           }
         }
 
-        // Render tool calls
+        // Handle tool calls
         if (assistantMsg.message.tool_calls && assistantMsg.message.tool_calls.length > 0) {
           for (const toolCall of assistantMsg.message.tool_calls) {
-            console.log();
             try {
               const args = JSON.parse(toolCall.function.arguments);
-              printToolCall(toolCall.function.name, args);
-              // Record start time for this tool
-              this.toolStartTimes.set(toolCall.id, Date.now());
+              this.toolManager.addTool(toolCall.id, toolCall.function.name, args);
+              this.toolManager.updateToolStatus(toolCall.id, 'running');
             } catch {
-              printToolCall(toolCall.function.name, { args: toolCall.function.arguments });
-              this.toolStartTimes.set(toolCall.id, Date.now());
+              this.toolManager.addTool(toolCall.id, toolCall.function.name, {
+                args: toolCall.function.arguments,
+              });
+              this.toolManager.updateToolStatus(toolCall.id, 'running');
             }
           }
+          // Display tools after adding them
+          this.terminalRenderer.display(this.toolManager.getTools());
+          this.hasDisplayedTools = true;
         }
         break;
       }
 
       case 'tool_result': {
         const toolMsg = message as SDKToolResultMessage;
-        const startTime = this.toolStartTimes.get(toolMsg.tool_use_id);
-        const duration = startTime ? (Date.now() - startTime) / 1000 : undefined;
 
-        console.log();
-        printToolResult(toolMsg.tool_name, toolMsg.is_error, duration);
+        // Update tool status and result
+        if (toolMsg.is_error) {
+          this.toolManager.setToolError(toolMsg.tool_use_id, String(toolMsg.result));
+        } else {
+          this.toolManager.setToolResult(toolMsg.tool_use_id, toolMsg.result);
+          this.toolManager.updateToolStatus(toolMsg.tool_use_id, 'completed');
+        }
 
-        // Format and display result
-        const formatted = formatToolResult(toolMsg.result);
-        console.log(`  ${chalk.gray(formatted)}`);
-
-        // Clean up start time
-        this.toolStartTimes.delete(toolMsg.tool_use_id);
+        // Re-display all tools
+        this.terminalRenderer.display(this.toolManager.getTools());
+        this.hasDisplayedTools = true;
         break;
       }
     }
