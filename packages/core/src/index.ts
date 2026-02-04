@@ -163,6 +163,8 @@ export type { TaskListInput, TaskListOutput } from './tools/task-list';
 export type { TaskCreateInput, TaskCreateOutput } from './tools/task-create';
 export type { TaskGetInput, TaskGetOutput } from './tools/task-get';
 export type { TaskUpdateInput, TaskUpdateOutput } from './tools/task-update';
+export type { WebSearchInput, WebSearchOutput, WebSearchResult } from './tools/web-search';
+export type { WebFetchInput, WebFetchOutput } from './tools/web-fetch';
 
 // Re-export task types
 export type { Task, TaskStatus, TaskStorage } from './types/task';
@@ -196,6 +198,10 @@ export {
   taskGetTool,
   TaskUpdateTool,
   taskUpdateTool,
+  WebSearchTool,
+  webSearchTool,
+  WebFetchTool,
+  webFetchTool,
 } from './tools/registry';
 
 // Re-export agent

@@ -13,6 +13,8 @@ import { TaskListTool } from './task-list';
 import { TaskCreateTool } from './task-create';
 import { TaskGetTool } from './task-get';
 import { TaskUpdateTool } from './task-update';
+import { WebSearchTool } from './web-search';
+import { WebFetchTool } from './web-fetch';
 
 export class ToolRegistry {
   private tools = new Map<string, Tool<any, any>>();
@@ -67,6 +69,8 @@ export function createDefaultRegistry(): ToolRegistry {
   registry.register(new TaskCreateTool());
   registry.register(new TaskGetTool());
   registry.register(new TaskUpdateTool());
+  registry.register(new WebSearchTool());
+  registry.register(new WebFetchTool());
   return registry;
 }
 
@@ -84,3 +88,5 @@ export { taskListTool, TaskListTool } from './task-list';
 export { taskCreateTool, TaskCreateTool } from './task-create';
 export { taskGetTool, TaskGetTool } from './task-get';
 export { taskUpdateTool, TaskUpdateTool } from './task-update';
+export { webSearchTool, WebSearchTool } from './web-search';
+export { webFetchTool, WebFetchTool } from './web-fetch';
