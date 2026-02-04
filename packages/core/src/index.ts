@@ -10,6 +10,21 @@ import { createDefaultRegistry } from './tools/registry';
 import { ReActLoop } from './agent/react-loop';
 // ToolRegistry type used indirectly through createDefaultRegistry
 
+// Export permission system
+export {
+  PermissionManager,
+  type PermissionMode,
+  type PermissionOptions,
+  type PermissionResult,
+  type CanUseTool,
+  type PermissionCheckResult,
+  type PlanLogEntry,
+  SENSITIVE_TOOLS,
+  EDIT_TOOLS,
+  isSensitiveTool,
+  isEditTool,
+} from './permissions';
+
 export interface PromptOptions {
   /** Model identifier (e.g., 'gpt-4', 'gpt-4o', 'gemini-2.0-flash') */
   model: string;
