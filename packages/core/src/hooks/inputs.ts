@@ -11,6 +11,8 @@ import type {
   SessionEndHookInput,
   PermissionRequestHookInput,
   PostToolUseFailureHookInput,
+  SubagentStartHookInput,
+  SubagentStopHookInput,
   ExitReason,
   PermissionUpdate,
 } from './types';
@@ -147,5 +149,43 @@ export function createPostToolUseFailureInput(
     tool_input: toolInput,
     error,
     is_interrupt: isInterrupt,
+  };
+}
+
+/**
+ * Create SubagentStart hook input
+ */
+export function createSubagentStartInput(
+  sessionId: string,
+  cwd: string,
+  subagentId: string,
+  subagentType: string,
+  prompt: string,
+  transcriptPath?: string,
+  permissionMode?: string
+): SubagentStartHookInput {
+  return {
+    ...createBaseHookInput(sessionId, cwd, transcriptPath, permissionMode),
+    hook_event_name: 'SubagentStart',
+    subagent_id: subagentId,
+    subagent_type: subagentType,
+    prompt,
+  };
+}
+
+/**
+ * Create SubagentStop hook input
+ */
+export function createSubagentStopInput(
+  sessionId: string,
+  cwd: string,
+  stopHookActive: boolean,
+  transcriptPath?: string,
+  permissionMode?: string
+): SubagentStopHookInput {
+  return {
+    ...createBaseHookInput(sessionId, cwd, transcriptPath, permissionMode),
+    hook_event_name: 'SubagentStop',
+    stop_hook_active: stopHookActive,
   };
 }

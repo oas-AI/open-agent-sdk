@@ -224,6 +224,33 @@ export {
 // Re-export agent
 export { ReActLoop, type ReActLoopConfig, type ReActResult, type ReActStreamEvent } from './agent/react-loop';
 
+// Re-export agent definitions
+export {
+  AgentDefinitionSchema,
+  validateAgentDefinition,
+  safeValidateAgentDefinition,
+  createAgentDefinition,
+  hasCustomTools,
+  inheritsModel,
+  hasCustomMaxTurns,
+  hasCustomPermissionMode,
+  type AgentDefinition,
+  type AgentDefinitions,
+  type ModelIdentifier,
+} from './agent/agent-definition';
+
+// Re-export subagent runner
+export {
+  runSubagent,
+  isSubagentSuccess,
+  formatSubagentResult,
+  type SubagentResult,
+  type SubagentContext,
+} from './agent/subagent-runner';
+
+// Re-export task tool
+export { TaskTool, createTaskTool, createTaskToolFromConfig, type TaskInput, type TaskOutput, type TaskToolConfig } from './tools/task';
+
 // Re-export message helpers
 export {
   createUserMessage,
@@ -267,6 +294,8 @@ export {
   type PostToolUseHookInput,
   type SessionStartHookInput,
   type SessionEndHookInput,
+  type SubagentStartHookInput,
+  type SubagentStopHookInput,
   type ExitReason,
   type HookCallback,
   type HookCallbackMatcher,
@@ -278,4 +307,6 @@ export {
   createPostToolUseInput,
   createSessionStartInput,
   createSessionEndInput,
+  createSubagentStartInput,
+  createSubagentStopInput,
 } from './hooks';

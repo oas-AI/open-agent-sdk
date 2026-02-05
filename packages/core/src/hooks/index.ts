@@ -42,4 +42,6 @@ export {
   createPostToolUseInput,
   createSessionStartInput,
   createSessionEndInput,
+  createSubagentStartInput,
+  createSubagentStopInput,
 } from './inputs';

@@ -92,8 +92,9 @@ export type StopHookInput = BaseHookInput & {
 /** SubagentStart hook input */
 export type SubagentStartHookInput = BaseHookInput & {
   hook_event_name: 'SubagentStart';
-  agent_id: string;
-  agent_type: string;
+  subagent_id: string;
+  subagent_type: string;
+  prompt: string;
 };
 
 /** SubagentStop hook input */
