@@ -69,6 +69,8 @@ export interface ReActResult {
     input_tokens: number;
     output_tokens: number;
   };
+  /** Whether the execution resulted in an error or was aborted */
+  isError?: boolean;
 }
 
 /** Stream event types for ReActLoop.runStream() */
@@ -194,6 +196,7 @@ export class ReActLoop {
             input_tokens: totalInputTokens,
             output_tokens: totalOutputTokens,
           },
+          isError: true,
         };
       }
 
@@ -252,6 +255,7 @@ export class ReActLoop {
         input_tokens: totalInputTokens,
         output_tokens: totalOutputTokens,
       },
+      isError: true,
     };
   }
 

@@ -44,6 +44,12 @@ export interface ChatOptions {
   systemInstruction?: string;
 }
 
+/** Token usage for cost calculation */
+export interface TokenUsage {
+  input_tokens: number;
+  output_tokens: number;
+}
+
 /** Abstract base class for LLM providers */
 export abstract class LLMProvider {
   protected config: ProviderConfig;
@@ -73,6 +79,14 @@ export abstract class LLMProvider {
   getModel(): string {
     return this.config.model;
   }
+
+  /**
+   * Calculate cost for token usage
+   * Override this method to provide accurate cost calculation
+   * @param usage Token usage statistics
+   * @returns Cost in USD, or undefined if not available
+   */
+  getCost?(usage: TokenUsage): number | undefined;
 }
 
 /** Provider factory type */

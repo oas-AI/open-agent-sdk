@@ -138,7 +138,6 @@ describe('SubagentRunner', () => {
       const mockResult: SubagentResult = {
         result: 'Task completed successfully',
         agentId: 'agent-123',
-        isError: false,
         usage: {
           inputTokens: 100,
           outputTokens: 50,
@@ -146,7 +145,7 @@ describe('SubagentRunner', () => {
         durationMs: 1500,
       };
 
-      expect(mockResult.isError).toBe(false);
+      expect(mockResult.error).toBeUndefined();
       expect(mockResult.result).toBe('Task completed successfully');
       expect(mockResult.usage.inputTokens).toBe(100);
       expect(mockResult.usage.outputTokens).toBe(50);
@@ -157,15 +156,15 @@ describe('SubagentRunner', () => {
       const mockResult: SubagentResult = {
         result: 'Error: Maximum turns reached without completion',
         agentId: 'agent-456',
-        isError: true,
         usage: {
           inputTokens: 200,
           outputTokens: 100,
         },
         durationMs: 5000,
+        error: 'Maximum turns reached without completion',
       };
 
-      expect(mockResult.isError).toBe(true);
+      expect(mockResult.error).toBeDefined();
       expect(mockResult.result).toContain('Error');
     });
 
@@ -245,9 +244,9 @@ describe('SubagentRunner', () => {
         return {
           result: 'Error: Tool execution failed',
           agentId: 'agent-789',
-          isError: true,
           usage: { inputTokens: 10, outputTokens: 5 },
           durationMs: 100,
+          error: 'Tool execution failed',
         };
       };
 
@@ -255,7 +254,7 @@ describe('SubagentRunner', () => {
       const result = await runSubagent();
       mainAgentContinued = true;
 
-      expect(result.isError).toBe(true);
+      expect(result.error).toBeDefined();
       expect(mainAgentContinued).toBe(true);
     });
   });

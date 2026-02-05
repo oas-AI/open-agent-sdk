@@ -187,7 +187,7 @@ export type { WebFetchInput, WebFetchOutput } from './tools/web-fetch';
 export type { Task, TaskStatus, TaskStorage } from './types/task';
 
 // Re-export providers
-export { LLMProvider, type LLMChunk, type ProviderConfig, type ChatOptions } from './providers/base';
+export { LLMProvider, type LLMChunk, type ProviderConfig, type ChatOptions, type TokenUsage } from './providers/base';
 export { OpenAIProvider, type OpenAIConfig } from './providers/openai';
 export { GoogleProvider, type GoogleConfig } from './providers/google';
 

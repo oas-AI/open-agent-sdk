@@ -15,19 +15,21 @@ import { logger } from '../utils/logger';
  * Result from subagent execution
  */
 export interface SubagentResult {
-  /** Final result text or error message */
+  /** Final result message (or error description if failed) */
   result: string;
   /** Unique identifier for the subagent instance */
   agentId: string;
-  /** Whether the execution resulted in an error */
-  isError: boolean;
   /** Token usage statistics */
   usage: {
     inputTokens: number;
     outputTokens: number;
   };
+  /** Cost in USD (only if provider supports cost calculation) */
+  costUsd?: number;
   /** Execution duration in milliseconds */
   durationMs: number;
+  /** Error details if execution failed (optional) */
+  error?: string;
 }
 
 /**
@@ -203,17 +205,26 @@ export async function runSubagent(
 
     await context.hookManager.emit('SubagentStop', subagentStopInput, undefined);
 
+    // Calculate cost if provider supports it
+    const provider = context.parentContext.provider;
+    const costUsd = provider.getCost?.({
+      input_tokens: result.usage.input_tokens,
+      output_tokens: result.usage.output_tokens,
+    });
+
+    // Check if execution resulted in an error (based on ReActLoop's isError flag)
+    const hasError = result.isError ?? false;
+
     return {
       result: result.result,
       agentId,
-      isError: result.result.includes('Maximum turns reached') ||
-               result.result.includes('Error:') ||
-               result.result.includes('Operation aborted'),
       usage: {
         inputTokens: result.usage.input_tokens,
         outputTokens: result.usage.output_tokens,
       },
+      costUsd,
       durationMs,
+      ...(hasError && { error: result.result }),
     };
   } catch (error) {
     const durationMs = Date.now() - startTime;
@@ -239,12 +250,12 @@ export async function runSubagent(
     return {
       result: `Error: ${errorMessage}`,
       agentId,
-      isError: true,
       usage: {
         inputTokens: 0,
         outputTokens: 0,
       },
       durationMs,
+      error: errorMessage,
     };
   }
 }
@@ -253,7 +264,7 @@ export async function runSubagent(
  * Helper to check if a subagent result indicates success
  */
 export function isSubagentSuccess(result: SubagentResult): boolean {
-  return !result.isError;
+  return result.error === undefined;
 }
 
 /**

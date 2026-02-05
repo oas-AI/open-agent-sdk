@@ -127,7 +127,6 @@ describe('Task Tool', () => {
       const mockOutput: TaskOutput = {
         result: 'Code review completed successfully',
         agent_id: 'agent-12345',
-        isError: false,
         usage: {
           input_tokens: 150,
           output_tokens: 200,
@@ -138,25 +137,25 @@ describe('Task Tool', () => {
 
       expect(mockOutput.result).toBeDefined();
       expect(mockOutput.agent_id).toMatch(/^agent-/);
-      expect(mockOutput.isError).toBe(false);
+      expect(mockOutput.error).toBeUndefined();
       expect(mockOutput.usage.input_tokens).toBeGreaterThanOrEqual(0);
       expect(mockOutput.usage.output_tokens).toBeGreaterThanOrEqual(0);
       expect(mockOutput.duration_ms).toBeGreaterThanOrEqual(0);
     });
 
-    it('应在失败时返回isError=true', () => {
+    it('应在失败时返回error字段', () => {
       const mockOutput: TaskOutput = {
         result: 'Error: Maximum turns reached without completion',
         agent_id: 'agent-67890',
-        isError: true,
         usage: {
           input_tokens: 500,
           output_tokens: 300,
         },
         duration_ms: 15000,
+        error: 'Maximum turns reached without completion',
       };
 
-      expect(mockOutput.isError).toBe(true);
+      expect(mockOutput.error).toBeDefined();
       expect(mockOutput.result).toContain('Error');
     });
 
@@ -175,15 +174,33 @@ describe('Task Tool', () => {
       expect(mockOutput.usage.output_tokens).toBe(150);
     });
 
-    it('应计算正确的total_cost_usd', () => {
-      // Mock cost calculation: $0.00001 per input token, $0.00003 per output token
-      const inputTokens = 1000;
-      const outputTokens = 500;
-      const inputCost = inputTokens * 0.00001;
-      const outputCost = outputTokens * 0.00003;
-      const totalCost = inputCost + outputCost;
+    it('应在费用可用时返回total_cost_usd', () => {
+      const mockOutput: TaskOutput = {
+        result: 'Success',
+        agent_id: 'agent-22222',
+        usage: {
+          input_tokens: 1000,
+          output_tokens: 500,
+        },
+        total_cost_usd: 0.025,
+        duration_ms: 2000,
+      };
 
-      expect(totalCost).toBe(0.01 + 0.015); // $0.025
+      expect(mockOutput.total_cost_usd).toBe(0.025);
+    });
+
+    it('应在费用不可用时省略total_cost_usd', () => {
+      const mockOutput: TaskOutput = {
+        result: 'Success',
+        agent_id: 'agent-33333',
+        usage: {
+          input_tokens: 100,
+          output_tokens: 50,
+        },
+        duration_ms: 500,
+      };
+
+      expect(mockOutput.total_cost_usd).toBeUndefined();
     });
   });
 

@@ -24,23 +24,24 @@ export interface TaskInput {
 
 /**
  * Output from the Task tool
+ * Aligned with Claude Agent SDK TaskOutput
  */
 export interface TaskOutput {
-  /** Final result or error message */
+  /** Final result message from the subagent (or error description if failed) */
   result: string;
   /** Subagent instance ID */
   agent_id: string;
-  /** Whether execution failed */
-  isError?: boolean;
   /** Token usage statistics */
   usage: {
     input_tokens: number;
     output_tokens: number;
   };
-  /** Total cost in USD */
+  /** Total cost in USD (only if provider supports cost calculation) */
   total_cost_usd?: number;
   /** Execution duration in milliseconds */
   duration_ms: number;
+  /** Error details if the subagent failed (optional extension beyond SDK) */
+  error?: string;
 }
 
 /**
@@ -82,21 +83,6 @@ const parameters: JSONSchema = {
   },
   required: ['description', 'prompt', 'subagent_type'],
 };
-
-/**
- * Calculate approximate cost in USD
- * Using placeholder rates - in production these would come from provider
- */
-function calculateCost(inputTokens: number, outputTokens: number): number {
-  // Approximate rates per 1K tokens
-  const inputRate = 0.003; // $3 per 1M tokens
-  const outputRate = 0.015; // $15 per 1M tokens
-
-  const inputCost = (inputTokens / 1000) * inputRate;
-  const outputCost = (outputTokens / 1000) * outputRate;
-
-  return Number((inputCost + outputCost).toFixed(6));
-}
 
 /**
  * Task tool implementation
@@ -145,25 +131,19 @@ export class TaskTool implements Tool<TaskInput, TaskOutput> {
     // Execute the subagent
     const result = await runSubagent(agentDef, input.prompt, input.subagent_type, subagentContext);
 
-    // Calculate cost
-    const totalCostUsd = calculateCost(
-      result.usage.inputTokens,
-      result.usage.outputTokens
-    );
-
     logger.debug(`[TaskTool] Task completed: ${input.description}`);
-    logger.debug(`[TaskTool] Duration: ${result.durationMs}ms, Cost: $${totalCostUsd}`);
+    logger.debug(`[TaskTool] Duration: ${result.durationMs}ms${result.costUsd !== undefined ? `, Cost: $${result.costUsd}` : ''}`);
 
     return {
       result: result.result,
       agent_id: result.agentId,
-      isError: result.isError,
       usage: {
         input_tokens: result.usage.inputTokens,
         output_tokens: result.usage.outputTokens,
       },
-      total_cost_usd: totalCostUsd,
+      ...(result.costUsd !== undefined && { total_cost_usd: result.costUsd }),
       duration_ms: result.durationMs,
+      ...(result.error && { error: result.error }),
     };
   };
 }
