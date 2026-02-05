@@ -4,6 +4,7 @@
 
 import chalk from 'chalk';
 import type { ToolCallState } from './tool-manager.js';
+import type { FileCache } from './file-cache.js';
 import {
   getToolIcon,
   formatDuration,
@@ -12,9 +13,18 @@ import {
   getStatusIndicator,
   createCodeBlock,
 } from './format.js';
+import { formatDiff, formatDiffSummary, getDiffStats } from './diff.js';
 
 export class TerminalRenderer {
   private lastRenderedLines = 0;
+  private fileCache?: FileCache;
+
+  /**
+   * Set the file cache for retrieving original content
+   */
+  setFileCache(fileCache: FileCache): void {
+    this.fileCache = fileCache;
+  }
 
   /**
    * ANSI escape sequence to clear current line
@@ -127,27 +137,112 @@ export class TerminalRenderer {
       lines.push('');
       lines.push(`  ${chalk.red('Error:')} ${tool.error}`);
     } else if ((tool.status === 'completed' || tool.expanded) && tool.result !== undefined) {
-      const resultStr = formatToolResult(tool.result);
-      if (resultStr) {
-        lines.push('');
-        lines.push(`  ${chalk.gray('Result:')}`);
-
-        // Format result in a code block if it's multi-line
-        const resultLines = resultStr.split('\n');
-        if (resultLines.length > 1 || resultStr.length > 50) {
-          const codeBlock = createCodeBlock(resultLines, 76);
-          const indentedBlock = codeBlock
-            .split('\n')
-            .map(line => `  ${line}`)
-            .join('\n');
-          lines.push(indentedBlock);
+      // Special handling for Write and Edit tools
+      if (tool.name === 'Write' || tool.name === 'Edit') {
+        const filePath = tool.args.file_path as string | undefined;
+        if (filePath) {
+          lines.push('');
+          lines.push(...this.renderFileChange(tool.name, filePath, tool.result));
         } else {
-          lines.push(`    ${resultStr}`);
+          // Fallback to standard result display
+          this.appendStandardResult(lines, tool.result);
         }
+      } else {
+        this.appendStandardResult(lines, tool.result);
       }
     }
 
     return lines.join('\n');
+  }
+
+  /**
+   * Render file change (Write/Edit) with diff
+   */
+  private renderFileChange(toolName: string, filePath: string, result: unknown): string[] {
+    const lines: string[] = [];
+    const originalContent = this.fileCache?.getOriginal(filePath);
+
+    if (toolName === 'Write') {
+      // For Write tool, show content preview or diff
+      if (originalContent !== undefined) {
+        // File was overwritten - show diff
+        const newContent = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+        lines.push(`  ${chalk.yellow('⚠ Overwriting existing file:')} ${chalk.cyan(filePath)}`);
+        lines.push('');
+        lines.push(chalk.gray('  Changes:'));
+        const diff = formatDiffSummary(originalContent, newContent, 15);
+        const indentedDiff = diff.split('\n').map(l => `    ${l}`).join('\n');
+        lines.push(indentedDiff);
+      } else {
+        // New file - show preview
+        lines.push(`  ${chalk.green('✓ Creating new file:')} ${chalk.cyan(filePath)}`);
+        const content = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+        const contentLines = content.split('\n');
+        if (contentLines.length > 0) {
+          lines.push('');
+          lines.push(chalk.gray('  Preview:'));
+          const previewLines = contentLines.slice(0, 10);
+          const codeBlock = createCodeBlock(previewLines, 72);
+          const indentedBlock = codeBlock.split('\n').map(l => `    ${l}`).join('\n');
+          lines.push(indentedBlock);
+          if (contentLines.length > 10) {
+            lines.push(chalk.gray(`    ... and ${contentLines.length - 10} more lines`));
+          }
+        }
+      }
+    } else if (toolName === 'Edit' && originalContent !== undefined) {
+      // For Edit tool, show diff
+      lines.push(`  ${chalk.cyan('File:')} ${filePath}`);
+      lines.push('');
+      lines.push(chalk.gray('  Changes:'));
+
+      // Get the new content from the result
+      let newContent: string;
+      if (typeof result === 'string') {
+        newContent = result;
+      } else if (result && typeof result === 'object' && 'content' in result) {
+        newContent = String(result.content);
+      } else {
+        newContent = JSON.stringify(result, null, 2);
+      }
+
+      const stats = getDiffStats(originalContent, newContent);
+      const diff = formatDiffSummary(originalContent, newContent, 15);
+      const indentedDiff = diff.split('\n').map(l => `    ${l}`).join('\n');
+      lines.push(indentedDiff);
+      lines.push('');
+      lines.push(`  ${chalk.green(`+${stats.added}`)} ${chalk.red(`-${stats.removed}`)} lines`);
+    } else {
+      // Fallback
+      lines.push(`  ${chalk.cyan('File:')} ${filePath}`);
+      this.appendStandardResult(lines, result);
+    }
+
+    return lines;
+  }
+
+  /**
+   * Append standard result formatting
+   */
+  private appendStandardResult(lines: string[], result: unknown): void {
+    const resultStr = formatToolResult(result);
+    if (resultStr) {
+      lines.push('');
+      lines.push(`  ${chalk.gray('Result:')}`);
+
+      // Format result in a code block if it's multi-line
+      const resultLines = resultStr.split('\n');
+      if (resultLines.length > 1 || resultStr.length > 50) {
+        const codeBlock = createCodeBlock(resultLines, 76);
+        const indentedBlock = codeBlock
+          .split('\n')
+          .map(line => `  ${line}`)
+          .join('\n');
+        lines.push(indentedBlock);
+      } else {
+        lines.push(`    ${resultStr}`);
+      }
+    }
   }
 
   /**

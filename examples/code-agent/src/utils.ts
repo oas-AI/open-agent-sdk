@@ -83,9 +83,13 @@ export function printHelp(): void {
   console.log();
 }
 
-/** Print a formatted user prompt */
-export function printUserPrompt(): void {
-  process.stdout.write(chalk.blue.bold('You: '));
+/** Print a formatted user prompt with mode indicator */
+export function printUserPrompt(mode?: string): void {
+  if (mode && mode !== 'default') {
+    process.stdout.write(chalk.cyan(`[${mode}] `) + chalk.blue.bold('> '));
+  } else {
+    process.stdout.write(chalk.blue.bold('> '));
+  }
 }
 
 /** Print the assistant's response prefix */

@@ -111,14 +111,24 @@ export class GoogleProvider extends LLMProvider {
               .join('');
             return { role: 'assistant', content: text };
           }
-          case 'tool_result':
+          case 'tool_result': {
+            // Get tool name from the tool call in the previous assistant message
+            const toolName = msg.tool_use_id ? 'Tool' : 'unknown';
+            // Output must be wrapped in {type, value} format per Vercel AI SDK schema
+            const outputValue = typeof msg.result === 'string' ? msg.result : JSON.stringify(msg.result);
             return {
               role: 'tool',
-              toolCallId: msg.tool_use_id,
-              content: typeof msg.result === 'string'
-                ? msg.result
-                : JSON.stringify(msg.result),
+              content: [{
+                type: 'tool-result',
+                toolCallId: msg.tool_use_id,
+                toolName,
+                output: {
+                  type: 'text',
+                  value: outputValue,
+                },
+              }],
             } as unknown as ModelMessage;
+          }
           default:
             return null;
         }

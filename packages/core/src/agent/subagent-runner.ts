@@ -271,7 +271,7 @@ export function isSubagentSuccess(result: SubagentResult): boolean {
  * Helper to format subagent result for display
  */
 export function formatSubagentResult(result: SubagentResult): string {
-  const status = result.isError ? 'FAILED' : 'SUCCESS';
+  const status = result.error !== undefined ? 'FAILED' : 'SUCCESS';
   return `[${status}] ${result.agentId}: ${result.result.substring(0, 100)}${
     result.result.length > 100 ? '...' : ''
   }`;

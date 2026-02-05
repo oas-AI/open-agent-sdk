@@ -4,11 +4,16 @@
 
 import readline from 'readline';
 import chalk from 'chalk';
-import type { SDKMessage, SDKAssistantMessage, SDKToolResultMessage, PermissionResult } from '@open-agent-sdk/core';
+import type { SDKMessage, SDKAssistantMessage, SDKToolResultMessage, SDKResultMessage, PermissionResult } from '@open-agent-sdk/core';
 import { Session, createSession, FileStorage, SENSITIVE_TOOLS } from '@open-agent-sdk/core';
+import type { FileCache, FileChangeTracker } from './utils/index.js';
+import { ToolManager, TerminalRenderer, createFileCache, createFileChangeTracker } from './utils/index.js';
 
 /** Permission choice type */
 type PermissionChoice = 'allow' | 'deny' | 'always';
+
+/** Permission mode type */
+type PermissionMode = 'default' | 'plan' | 'acceptEdits';
 
 /** Tool permissions tracking */
 interface ToolPermissions {
@@ -17,6 +22,13 @@ interface ToolPermissions {
   /** Whether to allow all tools this session */
   allowAll: boolean;
 }
+
+/** Mode display names */
+const MODE_DISPLAY_NAMES: Record<PermissionMode, string> = {
+  default: 'default',
+  plan: 'plan',
+  acceptEdits: 'accept edits',
+};
 import {
   printHeader,
   printHelp,
@@ -30,7 +42,6 @@ import {
   Spinner,
 } from './utils.js';
 import { executeCommand } from './commands.js';
-import { ToolManager, TerminalRenderer } from './utils/index.js';
 import { createBuiltInHooksConfig } from './hooks/index.js';
 
 /** CLI class managing the interactive session */
@@ -43,11 +54,15 @@ export class CLI {
   private spinner: Spinner;
   private toolManager: ToolManager;
   private terminalRenderer: TerminalRenderer;
+  private fileCache: FileCache;
+  private changeTracker: FileChangeTracker;
   private hasDisplayedTools = false;
   private toolPermissions: ToolPermissions = {
     alwaysAllowed: new Set(),
     allowAll: false,
   };
+  private currentMode: PermissionMode = 'default';
+  private readonly modes: PermissionMode[] = ['default', 'plan', 'acceptEdits'];
 
   constructor() {
     this.rl = readline.createInterface({
@@ -65,10 +80,62 @@ export class CLI {
     this.toolManager = new ToolManager();
     this.terminalRenderer = new TerminalRenderer();
 
+    // Initialize file cache and change tracker
+    this.fileCache = createFileCache();
+    this.changeTracker = createFileChangeTracker();
+    this.terminalRenderer.setFileCache(this.fileCache);
+
     // Handle Ctrl+C
     this.rl.on('SIGINT', () => {
       this.handleSigint();
     });
+
+    // Handle Shift+Tab for mode switching
+    this.setupModeSwitching();
+  }
+
+  /**
+   * Setup keyboard listener for Shift+Tab mode switching
+   */
+  private setupModeSwitching(): void {
+    // @ts-expect-error - readline input has on method for keypress events
+    this.rl.input.on('keypress', (str: string, key: { name?: string; shift?: boolean }) => {
+      if (key && key.name === 'tab' && key.shift) {
+        this.cycleMode();
+      }
+    });
+  }
+
+  /**
+   * Cycle through permission modes: default -> plan -> acceptEdits -> default
+   */
+  private cycleMode(): void {
+    const currentIndex = this.modes.indexOf(this.currentMode);
+    const nextIndex = (currentIndex + 1) % this.modes.length;
+    this.currentMode = this.modes[nextIndex];
+
+    // Show mode change notification
+    console.log();
+    console.log(chalk.cyan(`🔄 Mode switched to: ${chalk.bold(MODE_DISPLAY_NAMES[this.currentMode])}`));
+    this.printModeDescription();
+  }
+
+  /**
+   * Print description of current mode
+   */
+  private printModeDescription(): void {
+    switch (this.currentMode) {
+      case 'default':
+        console.log(chalk.gray('   Write/Edit/Bash operations will ask for confirmation'));
+        break;
+      case 'plan':
+        console.log(chalk.gray('   Agent will plan but not execute tools (dry run)'));
+        break;
+      case 'acceptEdits':
+        console.log(chalk.gray('   Write/Edit allowed automatically, Bash still asks'));
+        break;
+    }
+    console.log();
   }
 
   /** Initialize and start the CLI */
@@ -97,8 +164,8 @@ export class CLI {
 
 Available tools:
 - Read: Read file contents
-- Write: Write content to files
-- Edit: Edit existing files
+- Write: Write content to files (creates new or overwrites existing)
+- Edit: Edit existing files (line-based editing)
 - Bash: Execute shell commands
 - Glob: Find files matching patterns
 - Grep: Search for text in files
@@ -123,6 +190,12 @@ When using tools:
 9. If an error occurs, explain what went wrong
 10. For destructive operations (writes/edits), the system will ask the user for confirmation
 
+When working with multiple files:
+1. **Plan first**: Use Glob to find all relevant files
+2. **Read all**: Read all files you need to modify before making changes
+3. **Batch edits**: Make all necessary edits in one go, don't ask for confirmation between each file
+4. **Verify**: Use Bash to run tests or verify the changes work correctly
+
 Be concise but thorough in your responses.`,
         storage: this.storage,
       });
@@ -130,6 +203,7 @@ Be concise but thorough in your responses.`,
       printSuccess(`Session created (ID: ${this.session.id})`);
       console.log();
       printInfo('Type /help for available commands, or just start chatting!');
+      printInfo('Press Shift+Tab to cycle through modes: default → plan → accept edits');
       console.log();
     } catch (error) {
       printError(`Failed to create session: ${error instanceof Error ? error.message : String(error)}`);
@@ -144,7 +218,7 @@ Be concise but thorough in your responses.`,
   private runLoop(): void {
     if (!this.isRunning) return;
 
-    printUserPrompt();
+    printUserPrompt(MODE_DISPLAY_NAMES[this.currentMode]);
 
     this.rl.question('', async (input) => {
       if (!this.isRunning) return;
@@ -190,6 +264,8 @@ Be concise but thorough in your responses.`,
 
     // Clear previous tool state for new message
     this.toolManager.clear();
+    this.fileCache.clear();
+    this.changeTracker.clear();
     this.hasDisplayedTools = false;
 
     // Create abort controller for this request
@@ -282,6 +358,7 @@ Be concise but thorough in your responses.`,
 
       case 'tool_result': {
         const toolMsg = message as SDKToolResultMessage;
+        const tool = this.toolManager.getTool(toolMsg.tool_use_id);
 
         // Update tool status and result
         if (toolMsg.is_error) {
@@ -289,11 +366,55 @@ Be concise but thorough in your responses.`,
         } else {
           this.toolManager.setToolResult(toolMsg.tool_use_id, toolMsg.result);
           this.toolManager.updateToolStatus(toolMsg.tool_use_id, 'completed');
+
+          // Track file changes for Write/Edit tools
+          if (tool && (tool.name === 'Write' || tool.name === 'Edit')) {
+            const filePath = tool.args.file_path as string;
+            const originalContent = this.fileCache.getOriginal(filePath);
+            const newContent = typeof toolMsg.result === 'string'
+              ? toolMsg.result
+              : (toolMsg.result && typeof toolMsg.result === 'object' && 'content' in toolMsg.result)
+                ? String(toolMsg.result.content)
+                : JSON.stringify(toolMsg.result, null, 2);
+
+            if (tool.name === 'Write') {
+              this.changeTracker.trackWrite(filePath, originalContent, newContent);
+            } else {
+              if (originalContent) {
+                this.changeTracker.trackEdit(filePath, originalContent, newContent);
+              }
+            }
+          }
         }
 
         // Re-display all tools
         this.terminalRenderer.display(this.toolManager.getTools());
         this.hasDisplayedTools = true;
+        break;
+      }
+
+      case 'result': {
+        const resultMsg = message as SDKResultMessage;
+
+        // Clear tool display before showing summary
+        if (this.hasDisplayedTools) {
+          this.terminalRenderer.clear();
+          this.hasDisplayedTools = false;
+        }
+
+        // Display file changes summary if any
+        if (this.changeTracker.hasChanges()) {
+          console.log(this.changeTracker.formatSummary());
+        }
+
+        // Display usage statistics
+        console.log();
+        console.log(chalk.gray('─'.repeat(40)));
+        const usage = resultMsg.usage;
+        const duration = resultMsg.duration_ms;
+        const turns = resultMsg.num_turns;
+        console.log(chalk.cyan(`📊 ↑${usage.input_tokens} ↓${usage.output_tokens} tokens | ${(duration / 1000).toFixed(1)}s | ${turns} turns`));
+        console.log(chalk.gray('─'.repeat(40)));
         break;
       }
     }
@@ -354,10 +475,54 @@ Be concise but thorough in your responses.`,
   }
 
   /**
+   * Check if a tool is an edit tool (Write or Edit)
+   */
+  private isEditTool(toolName: string): boolean {
+    return toolName === 'Write' || toolName === 'Edit';
+  }
+
+  /**
    * Create the canUseTool callback for session options
    */
   private createCanUseToolCallback(): (toolName: string, input: Record<string, unknown>) => Promise<PermissionResult> {
     return async (toolName: string, input: Record<string, unknown>) => {
+      // Cache file content before Edit/Write operations
+      if (this.isEditTool(toolName) && input.file_path) {
+        const filePath = String(input.file_path);
+        await this.fileCache.cacheBeforeEdit(filePath);
+      }
+
+      // Handle different permission modes
+      switch (this.currentMode) {
+        case 'plan':
+          // Plan mode: show what would be executed but don't actually execute
+          console.log();
+          console.log(chalk.yellow(`📋 [PLAN] Would execute ${chalk.bold(toolName)}:`));
+          if (toolName === 'Bash' && input.command) {
+            console.log(chalk.gray(`   Command: ${input.command}`));
+          } else if (this.isEditTool(toolName) && input.file_path) {
+            console.log(chalk.gray(`   File: ${input.file_path}`));
+          }
+          return {
+            behavior: 'deny',
+            message: `Tool ${toolName} blocked in plan mode`,
+            interrupt: false,
+          };
+
+        case 'acceptEdits':
+          // Accept edits mode: automatically allow Write/Edit, ask for others
+          if (this.isEditTool(toolName)) {
+            return { behavior: 'allow', updatedInput: input };
+          }
+          // Fall through to default behavior for non-edit tools
+          break;
+
+        case 'default':
+        default:
+          // Default mode: proceed with normal permission handling
+          break;
+      }
+
       // Check if all tools are allowed this session
       if (this.toolPermissions.allowAll) {
         return { behavior: 'allow', updatedInput: input };
