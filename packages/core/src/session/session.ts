@@ -7,6 +7,7 @@ import type { ReActLoop } from '../agent/react-loop';
 import type { SDKMessage } from '../types/messages';
 import type { SessionStorage, SessionData } from './storage';
 import { logger } from '../utils/logger';
+import { generateUUID } from '../utils/uuid';
 
 /** Session states following a state machine pattern */
 export enum SessionState {
@@ -69,15 +70,6 @@ export interface SessionOptions {
   parentSessionId?: string;
   /** Timestamp when this session was forked */
   forkedAt?: number;
-}
-
-/** Generate a simple UUID v4 */
-function generateUUID(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
 }
 
 /**
