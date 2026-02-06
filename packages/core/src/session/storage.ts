@@ -26,6 +26,12 @@ export interface SessionData {
   messages: SDKMessage[];
   /** Session options (excluding storage to avoid circular reference) */
   options: Omit<SessionOptions, 'storage'>;
+
+  // Fork tracking fields
+  /** Parent session ID if this session was forked */
+  parentSessionId?: string;
+  /** Timestamp when this session was forked */
+  forkedAt?: number;
 }
 
 /** Session configuration options */

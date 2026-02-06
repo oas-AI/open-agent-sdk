@@ -11,6 +11,9 @@ import { GoogleProvider } from './providers/google';
 import { AnthropicProvider } from './providers/anthropic';
 import { createDefaultRegistry } from './tools/registry';
 import { ReActLoop } from './agent/react-loop';
+import type { SessionStorage } from './session/storage';
+import { createSession, resumeSession, forkSession } from './session/factory';
+import type { Session } from './session/session';
 // ToolRegistry type used indirectly through createDefaultRegistry
 
 // Export permission system
@@ -59,6 +62,14 @@ export interface PromptOptions {
   logLevel?: LogLevel;
   /** Custom callback for tool permission checks */
   canUseTool?: CanUseTool;
+
+  // Session persistence options
+  /** Storage implementation for session persistence. If provided, session will be saved and can be resumed later */
+  storage?: SessionStorage;
+  /** Session ID to resume. When provided, continues the conversation from the specified session */
+  resume?: string;
+  /** Fork the session instead of resuming. When true with resume option, creates a new session with copied history */
+  forkSession?: boolean;
 }
 
 export interface PromptResult {
@@ -71,6 +82,8 @@ export interface PromptResult {
     input_tokens: number;
     output_tokens: number;
   };
+  /** Session ID for this conversation. Can be used to resume or fork later */
+  session_id?: string;
 }
 
 /**
@@ -100,6 +113,85 @@ export async function prompt(
 
   const startTime = Date.now();
 
+  // Get storage if provided
+  const storage = options.storage;
+
+  let session: Session | undefined;
+  let sessionId: string | undefined;
+
+  // Handle resume/fork logic
+  if (options.resume && storage) {
+    if (options.forkSession) {
+      // Fork mode: create new session from existing one
+      session = await forkSession(options.resume, {
+        storage,
+        apiKey: options.apiKey,
+        logLevel,
+        model: options.model,
+        provider: options.provider,
+        permissionMode: options.permissionMode,
+        allowDangerouslySkipPermissions: options.allowDangerouslySkipPermissions,
+        canUseTool: options.canUseTool,
+        hooks: undefined, // Will be loaded from source session
+      });
+    } else {
+      // Resume mode: continue existing session
+      session = await resumeSession(options.resume, {
+        storage,
+        apiKey: options.apiKey,
+        logLevel,
+        permissionMode: options.permissionMode,
+        allowDangerouslySkipPermissions: options.allowDangerouslySkipPermissions,
+        canUseTool: options.canUseTool,
+        hooks: undefined, // Will be loaded from source session
+      });
+    }
+    sessionId = session.id;
+
+    // Send the prompt message
+    await session.send(prompt);
+
+    // Collect all messages from the stream
+    let resultText = '';
+    let inputTokens = 0;
+    let outputTokens = 0;
+
+    for await (const message of session.stream()) {
+      if (message.type === 'assistant') {
+        // Extract text content from assistant message
+        const content = message.message.content;
+        if (typeof content === 'string') {
+          resultText = content;
+        } else if (Array.isArray(content)) {
+          resultText = content
+            .filter((c): c is { type: 'text'; text: string } => c.type === 'text')
+            .map((c) => c.text)
+            .join('');
+        }
+      }
+    }
+
+    // Get usage from the session's messages (approximation)
+    // Note: For accurate token counts, we'd need to track usage during streaming
+    // This is a simplified approach
+    const messages = session.getMessages();
+    inputTokens = estimateTokens(messages.map((m) => JSON.stringify(m)).join(''));
+    outputTokens = estimateTokens(resultText);
+
+    const duration_ms = Date.now() - startTime;
+
+    return {
+      result: resultText,
+      duration_ms,
+      usage: {
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+      },
+      session_id: sessionId,
+    };
+  }
+
+  // No resume/fork - use original one-shot behavior
   // Auto-detect provider from model name if not specified
   const modelLower = options.model.toLowerCase();
   const providerType = options.provider ??
@@ -150,11 +242,51 @@ export async function prompt(
 
   const duration_ms = Date.now() - startTime;
 
+  // If storage is provided, create and save a session
+  if (storage) {
+    session = await createSession({
+      model: options.model,
+      provider: options.provider,
+      apiKey: options.apiKey,
+      storage,
+      logLevel,
+      maxTurns: options.maxTurns,
+      allowedTools: options.allowedTools,
+      systemPrompt: options.systemPrompt,
+      cwd: options.cwd,
+      env: options.env,
+      permissionMode: options.permissionMode,
+      allowDangerouslySkipPermissions: options.allowDangerouslySkipPermissions,
+      canUseTool: options.canUseTool,
+      mcpServers: options.mcpServers,
+    });
+    sessionId = session.id;
+
+    // Send the prompt and stream to populate the session
+    await session.send(prompt);
+
+    // Collect messages to populate session history
+    for await (const _message of session.stream()) {
+      // Just consume the stream to populate session messages
+    }
+  }
+
   return {
     result: result.result,
     duration_ms,
     usage: result.usage,
+    session_id: sessionId,
   };
+}
+
+/**
+ * Estimate token count from text (rough approximation)
+ * @param text - Text to estimate tokens for
+ * @returns Estimated token count
+ */
+function estimateTokens(text: string): number {
+  // Rough approximation: ~4 characters per token on average
+  return Math.ceil(text.length / 4);
 }
 
 // PromptOptions and PromptResult are already exported as interfaces above
@@ -302,12 +434,14 @@ export {
   FileStorage,
   createSession,
   resumeSession,
+  forkSession,
   type SessionStorage,
   type SessionData,
   type SessionOptions as SessionStorageOptions,
   type FileStorageOptions,
   type CreateSessionOptions,
   type ResumeSessionOptions,
+  type ForkSessionOptions,
 } from './session';
 
 // Re-export logger

@@ -25,6 +25,8 @@ export {
 export {
   createSession,
   resumeSession,
+  forkSession,
   type CreateSessionOptions,
   type ResumeSessionOptions,
+  type ForkSessionOptions,
 } from './factory';

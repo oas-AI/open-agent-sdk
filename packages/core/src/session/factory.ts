@@ -68,6 +68,28 @@ export interface ResumeSessionOptions {
   hooks?: HooksConfig;
 }
 
+/** Options for forking an existing session */
+export interface ForkSessionOptions {
+  /** API key override (optional) */
+  apiKey?: string;
+  /** Storage implementation (defaults to InMemoryStorage) */
+  storage?: SessionStorage;
+  /** Log level: 'debug' | 'info' | 'warn' | 'error' | 'silent' (default: 'info') */
+  logLevel?: LogLevel;
+  /** Model override (optional) */
+  model?: string;
+  /** Provider override (optional) */
+  provider?: 'openai' | 'google' | 'anthropic';
+  /** Permission mode override (optional) */
+  permissionMode?: PermissionMode;
+  /** Required to be true when using bypassPermissions mode (optional) */
+  allowDangerouslySkipPermissions?: boolean;
+  /** Custom callback for tool permission checks (optional) */
+  canUseTool?: CanUseTool;
+  /** Hooks configuration (optional) */
+  hooks?: HooksConfig;
+}
+
 /**
  * Create a new session with the specified options
  * Automatically creates ReActLoop and persists initial session data
@@ -277,6 +299,144 @@ export async function resumeSession(
   if (!session) {
     throw new Error(`Failed to load session with ID "${sessionId}".`);
   }
+
+  return session;
+}
+
+/**
+ * Generate a simple UUID v4
+ */
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/**
+ * Fork an existing session, creating a new session with copied message history
+ * The new session can optionally override model, provider, and other options
+ *
+ * @param sourceSessionId - ID of the session to fork
+ * @param options - Optional configuration for the forked session
+ * @returns Promise resolving to the forked Session instance
+ * @throws Error if source session is not found in storage
+ *
+ * @example
+ * ```typescript
+ * // Fork a session to try a different approach
+ * const forked = await forkSession('original-session-id', {
+ *   storage: fileStorage,
+ *   model: 'claude-sonnet-4',  // Try with different model
+ * });
+ *
+ * // The forked session has the same message history as the original
+ * for await (const message of forked.stream()) {
+ *   console.log(message);
+ * }
+ * ```
+ */
+export async function forkSession(
+  sourceSessionId: string,
+  options: ForkSessionOptions = {}
+): Promise<Session> {
+  // Set log level from options or environment variable
+  const logLevel = options.logLevel ??
+    (process.env.OPEN_AGENT_SDK_LOG_LEVEL as LogLevel) ??
+    'info';
+  logger.setLevel(logLevel);
+
+  // Get storage (default to InMemoryStorage)
+  const storage = options.storage ?? new InMemoryStorage();
+
+  // Load source session data from storage
+  const sourceData = await storage.load(sourceSessionId);
+
+  if (!sourceData) {
+    throw new Error(`Source session "${sourceSessionId}" not found`);
+  }
+
+  // Determine provider and model (allow overrides)
+  const providerType = options.provider ?? sourceData.provider as 'openai' | 'google' | 'anthropic';
+  const model = options.model ?? sourceData.model;
+
+  // Get API key (use override, saved options, or env var)
+  const apiKey = options.apiKey ??
+    sourceData.options.apiKey ??
+    (providerType === 'google' ? process.env.GEMINI_API_KEY :
+     providerType === 'anthropic' ? process.env.ANTHROPIC_API_KEY : process.env.OPENAI_API_KEY);
+
+  if (!apiKey) {
+    const keyName = providerType === 'google' ? 'GEMINI_API_KEY' :
+                    providerType === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY';
+    throw new Error(
+      `${providerType} API key is required. Provide it via options.apiKey, saved session options, or ${keyName} environment variable.`
+    );
+  }
+
+  // Create provider
+  let provider;
+  if (providerType === 'google') {
+    provider = new GoogleProvider({ apiKey, model });
+  } else if (providerType === 'anthropic') {
+    provider = new AnthropicProvider({ apiKey, model });
+  } else {
+    provider = new OpenAIProvider({ apiKey, model });
+  }
+
+  // Create tool registry with default tools
+  const toolRegistry = createDefaultRegistry();
+
+  // Create ReAct loop with inherited options, overridden by new options
+  const loop = new ReActLoop(provider, toolRegistry, {
+    maxTurns: sourceData.options.maxTurns ?? 10,
+    systemPrompt: sourceData.options.systemPrompt,
+    allowedTools: sourceData.options.allowedTools,
+    cwd: sourceData.options.cwd,
+    env: sourceData.options.env,
+    permissionMode: options.permissionMode ?? sourceData.options.permissionMode,
+    allowDangerouslySkipPermissions: options.allowDangerouslySkipPermissions ?? sourceData.options.allowDangerouslySkipPermissions,
+    canUseTool: options.canUseTool,
+    mcpServers: sourceData.options.mcpServers,
+    hooks: options.hooks ?? sourceData.options.hooks,
+  });
+
+  // Generate new session ID
+  const newId = generateUUID();
+
+  // Create new Session instance
+  const session = new Session(loop, {
+    id: newId,
+    model,
+    provider: providerType,
+  }, storage);
+
+  // Copy message history from source session
+  (session as unknown as { messages: unknown[] }).messages = [...sourceData.messages];
+  (session as unknown as { createdAt: number }).createdAt = Date.now();
+
+  // Save forked session data with parent tracking
+  const forkedData: SessionData = {
+    id: newId,
+    model,
+    provider: providerType,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    messages: [...sourceData.messages],
+    options: {
+      ...sourceData.options,
+      model,
+      provider: providerType,
+      permissionMode: options.permissionMode ?? sourceData.options.permissionMode,
+      allowDangerouslySkipPermissions: options.allowDangerouslySkipPermissions ?? sourceData.options.allowDangerouslySkipPermissions,
+      hooks: options.hooks ?? sourceData.options.hooks,
+    },
+    parentSessionId: sourceSessionId,
+    forkedAt: Date.now(),
+  };
+
+  await storage.save(forkedData);
 
   return session;
 }
