@@ -8,7 +8,7 @@ import { ToolDefinition } from '../types/tools';
 /** Chunk from streaming LLM response */
 export interface LLMChunk {
   /** Type of chunk */
-  type: 'content' | 'tool_call' | 'usage' | 'done';
+  type: 'content' | 'tool_call' | 'usage' | 'done' | 'error';
   /** Content delta (for content type) */
   delta?: string;
   /** Tool call info (for tool_call type) */
@@ -22,6 +22,8 @@ export interface LLMChunk {
     input_tokens: number;
     output_tokens: number;
   };
+  /** Error message (for error type) */
+  error?: string;
 }
 
 /** Provider configuration */

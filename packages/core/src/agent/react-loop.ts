@@ -205,14 +205,32 @@ export class ReActLoop {
       turnCount++;
 
       // Call LLM
-      const assistantMessage = await this.callLLM(
-        messages,
-        toolDefinitions,
-        (tokens) => {
-          totalInputTokens += tokens.input;
-          totalOutputTokens += tokens.output;
+      let assistantMessage: SDKAssistantMessage;
+      try {
+        assistantMessage = await this.callLLM(
+          messages,
+          toolDefinitions,
+          (tokens) => {
+            totalInputTokens += tokens.input;
+            totalOutputTokens += tokens.output;
+          }
+        );
+      } catch (error) {
+        // Handle abort error from provider
+        if (error instanceof Error && error.message === 'Operation aborted') {
+          return {
+            result: 'Operation aborted',
+            messages,
+            turnCount,
+            usage: {
+              input_tokens: totalInputTokens,
+              output_tokens: totalOutputTokens,
+            },
+            isError: true,
+          };
         }
-      );
+        throw error;
+      }
 
       messages.push(assistantMessage);
 
@@ -369,14 +387,32 @@ export class ReActLoop {
       turnCount++;
 
       // Call LLM
-      const assistantMessage = await this.callLLM(
-        messages,
-        toolDefinitions,
-        (tokens) => {
-          totalInputTokens += tokens.input;
-          totalOutputTokens += tokens.output;
+      let assistantMessage: SDKAssistantMessage;
+      try {
+        assistantMessage = await this.callLLM(
+          messages,
+          toolDefinitions,
+          (tokens) => {
+            totalInputTokens += tokens.input;
+            totalOutputTokens += tokens.output;
+          }
+        );
+      } catch (error) {
+        // Handle abort error from provider
+        if (error instanceof Error && error.message === 'Operation aborted') {
+          yield { type: 'done', result: 'Operation aborted' };
+
+          // Trigger SessionEnd hook on abort
+          const sessionEndInput = createSessionEndInput(
+            this.sessionId,
+            this.config.cwd ?? process.cwd(),
+            'abort'
+          );
+          await this.hookManager.emit('SessionEnd', sessionEndInput, undefined);
+          return;
         }
-      );
+        throw error;
+      }
 
       messages.push(assistantMessage);
       yield { type: 'assistant', message: assistantMessage };
@@ -515,6 +551,12 @@ export class ReActLoop {
           if (chunk.usage) {
             inputTokens = chunk.usage.input_tokens;
             outputTokens = chunk.usage.output_tokens;
+          }
+          break;
+
+        case 'error':
+          if (chunk.error) {
+            throw new Error(chunk.error);
           }
           break;
       }

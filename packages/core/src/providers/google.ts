@@ -32,69 +32,86 @@ export class GoogleProvider extends LLMProvider {
     signal?: AbortSignal,
     options?: ChatOptions
   ): AsyncIterable<LLMChunk> {
-    // Convert message format
-    const coreMessages = this.convertToCoreMessages(messages);
+    try {
+      // Convert message format
+      const coreMessages = this.convertToCoreMessages(messages);
 
-    // Convert tools to Vercel AI SDK format
-    // ToolDefinition format: { type: 'function', function: { name, description, parameters } }
-    // Vercel AI SDK expects: { [name]: { description, inputSchema: Schema } }
-    // Note: Google Gemini API requires additionalProperties to be explicitly set
-    const vercelTools: Record<string, VercelTool> | undefined = tools?.length
-      ? Object.fromEntries(
-          tools.map((toolDef) => [
-            toolDef.function.name,
-            {
-              description: toolDef.function.description,
-              inputSchema: jsonSchema({
-                ...toolDef.function.parameters,
-                additionalProperties: toolDef.function.parameters.additionalProperties ?? false,
-              }),
-            },
-          ])
-        )
-      : undefined;
+      // Convert tools to Vercel AI SDK format
+      // ToolDefinition format: { type: 'function', function: { name, description, parameters } }
+      // Vercel AI SDK expects: { [name]: { description, inputSchema: Schema } }
+      // Note: Google Gemini API requires additionalProperties to be explicitly set
+      const vercelTools: Record<string, VercelTool> | undefined = tools?.length
+        ? Object.fromEntries(
+            tools.map((toolDef) => [
+              toolDef.function.name,
+              {
+                description: toolDef.function.description,
+                inputSchema: jsonSchema({
+                  ...toolDef.function.parameters,
+                  additionalProperties: toolDef.function.parameters.additionalProperties ?? false,
+                }),
+              },
+            ])
+          )
+        : undefined;
 
-    // Use Vercel AI SDK's streamText
-    const result = streamText({
-      model: this.googleAI(this.config.model),
-      messages: coreMessages,
-      system: options?.systemInstruction,
-      maxOutputTokens: this.config.maxTokens,
-      temperature: this.config.temperature,
-      abortSignal: signal,
-      tools: vercelTools,
-    });
+      // Use Vercel AI SDK's streamText
+      const result = streamText({
+        model: this.googleAI(this.config.model),
+        messages: coreMessages,
+        system: options?.systemInstruction,
+        maxOutputTokens: this.config.maxTokens,
+        temperature: this.config.temperature,
+        abortSignal: signal,
+        tools: vercelTools,
+      });
 
-    // Process stream response
-    for await (const textDelta of result.textStream) {
-      yield { type: 'content', delta: textDelta };
-    }
+      // Process stream response
+      for await (const textDelta of result.textStream) {
+        yield { type: 'content', delta: textDelta };
+      }
 
-    // Get tool calls after stream completes (they are complete at this point)
-    const toolCalls = await result.toolCalls;
-    for (const toolCall of toolCalls) {
+      // Get tool calls after stream completes (they are complete at this point)
+      const toolCalls = await result.toolCalls;
+      for (const toolCall of toolCalls) {
+        yield {
+          type: 'tool_call',
+          tool_call: {
+            id: toolCall.toolCallId,
+            name: toolCall.toolName,
+            // input can be undefined if the tool has no parameters, default to empty object
+            arguments: JSON.stringify(toolCall.input ?? {}),
+          },
+        };
+      }
+
+      // Get usage stats
+      const usage = await result.usage;
       yield {
-        type: 'tool_call',
-        tool_call: {
-          id: toolCall.toolCallId,
-          name: toolCall.toolName,
-          // input can be undefined if the tool has no parameters, default to empty object
-          arguments: JSON.stringify(toolCall.input ?? {}),
+        type: 'usage',
+        usage: {
+          input_tokens: usage.inputTokens ?? 0,
+          output_tokens: usage.outputTokens ?? 0,
         },
       };
+
+      yield { type: 'done' };
+    } catch (error) {
+      // Handle AbortError (including DOMException from Google SDK)
+      if (
+        error instanceof Error &&
+        (error.name === 'AbortError' || error.message?.toLowerCase().includes('abort'))
+      ) {
+        yield { type: 'error', error: 'Operation aborted' };
+        yield { type: 'done' };
+        return;
+      }
+
+      // Handle API errors - yield as error content instead of throwing
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      yield { type: 'error', error: errorMessage };
+      yield { type: 'done' };
     }
-
-    // Get usage stats
-    const usage = await result.usage;
-    yield {
-      type: 'usage',
-      usage: {
-        input_tokens: usage.inputTokens ?? 0,
-        output_tokens: usage.outputTokens ?? 0,
-      },
-    };
-
-    yield { type: 'done' };
   }
 
   private convertToCoreMessages(messages: SDKMessage[]): ModelMessage[] {
