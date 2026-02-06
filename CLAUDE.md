@@ -58,6 +58,18 @@ bun run build        # Build
 - **Types**: All public APIs must have complete types
 - **Structure**: `types/` (types), `tools/` (tools), `providers/` (providers), `agent/` (core logic), `session/` (session management), `permissions/` (permission system), `hooks/` (hooks framework)
 
+## Worktree Testing
+
+When running tests that require LLM API access in a worktree:
+- Load environment variables from the `.env` file in the main branch
+- This file contains API keys and proxy configurations
+- Use these environment variables when executing tests
+
+```bash
+# Example: Run tests with env from main worktree
+env $(cat /path/to/main/worktree/.env | xargs) bun test
+```
+
 ## Related Documents
 
 - [Requirements](REQUIREMENTS.md) - Complete feature requirements

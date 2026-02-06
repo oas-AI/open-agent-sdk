@@ -13,6 +13,10 @@ import type {
   PostToolUseFailureHookInput,
   SubagentStartHookInput,
   SubagentStopHookInput,
+  NotificationHookInput,
+  UserPromptSubmitHookInput,
+  StopHookInput,
+  PreCompactHookInput,
   ExitReason,
   PermissionUpdate,
 } from './types';
@@ -160,7 +164,7 @@ export function createSubagentStartInput(
   cwd: string,
   subagentId: string,
   subagentType: string,
-  prompt: string,
+  prompt?: string,
   transcriptPath?: string,
   permissionMode?: string
 ): SubagentStartHookInput {
@@ -187,5 +191,79 @@ export function createSubagentStopInput(
     ...createBaseHookInput(sessionId, cwd, transcriptPath, permissionMode),
     hook_event_name: 'SubagentStop',
     stop_hook_active: stopHookActive,
+  };
+}
+
+/**
+ * Create Notification hook input
+ * ⏳ No auto trigger point in ReActLoop — for application-level use only (planned v0.4.0+)
+ */
+export function createNotificationInput(
+  sessionId: string,
+  cwd: string,
+  message: string,
+  title?: string,
+  transcriptPath?: string,
+  permissionMode?: string
+): NotificationHookInput {
+  return {
+    ...createBaseHookInput(sessionId, cwd, transcriptPath, permissionMode),
+    hook_event_name: 'Notification',
+    message,
+    title,
+  };
+}
+
+/**
+ * Create Stop hook input
+ */
+export function createStopInput(
+  sessionId: string,
+  cwd: string,
+  stopHookActive: boolean,
+  transcriptPath?: string,
+  permissionMode?: string
+): StopHookInput {
+  return {
+    ...createBaseHookInput(sessionId, cwd, transcriptPath, permissionMode),
+    hook_event_name: 'Stop',
+    stop_hook_active: stopHookActive,
+  };
+}
+
+/**
+ * Create PreCompact hook input
+ * ⏳ No auto trigger point in ReActLoop — requires compact feature (planned v0.4.0+)
+ */
+export function createPreCompactInput(
+  sessionId: string,
+  cwd: string,
+  trigger: 'manual' | 'auto',
+  customInstructions: string | null = null,
+  transcriptPath?: string,
+  permissionMode?: string
+): PreCompactHookInput {
+  return {
+    ...createBaseHookInput(sessionId, cwd, transcriptPath, permissionMode),
+    hook_event_name: 'PreCompact',
+    trigger,
+    custom_instructions: customInstructions,
+  };
+}
+
+/**
+ * Create UserPromptSubmit hook input
+ */
+export function createUserPromptSubmitInput(
+  sessionId: string,
+  cwd: string,
+  prompt: string,
+  transcriptPath?: string,
+  permissionMode?: string
+): UserPromptSubmitHookInput {
+  return {
+    ...createBaseHookInput(sessionId, cwd, transcriptPath, permissionMode),
+    hook_event_name: 'UserPromptSubmit',
+    prompt,
   };
 }

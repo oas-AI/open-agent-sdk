@@ -3,7 +3,23 @@
  * Aligned with Claude Agent SDK
  */
 
-/** Available hook events */
+/**
+ * Available hook events
+ *
+ * Implementation status:
+ * - PreToolUse:        ✅ Triggered in ReActLoop.executeTool() before tool execution
+ * - PostToolUse:       ✅ Triggered in ReActLoop.executeTool() after successful execution
+ * - PostToolUseFailure:✅ Triggered in ReActLoop.executeTool() after failed execution
+ * - UserPromptSubmit:  ✅ Triggered in ReActLoop.run()/runStream() when user prompt is received
+ * - SessionStart:      ✅ Triggered in ReActLoop.runStream() at session start
+ * - SessionEnd:        ✅ Triggered in ReActLoop.runStream() at session end
+ * - Stop:              ✅ Triggered in ReActLoop when agent produces final answer (no tool calls)
+ * - SubagentStart:     ✅ Triggered in subagent-runner when subagent starts
+ * - SubagentStop:      ✅ Triggered in subagent-runner when subagent stops
+ * - PermissionRequest: ✅ Triggered in ReActLoop.executeTool() on permission denial
+ * - Notification:      ⏳ Helper only. No auto trigger — requires compact feature (planned v0.4.0+)
+ * - PreCompact:        ⏳ Helper only. No auto trigger — requires compact feature (planned v0.4.0+)
+ */
 export type HookEvent =
   | 'PreToolUse'
   | 'PostToolUse'
@@ -50,7 +66,9 @@ export type PostToolUseFailureHookInput = BaseHookInput & {
   is_interrupt?: boolean;
 };
 
-/** Notification hook input */
+/** Notification hook input
+ * ⏳ No auto trigger point — application-level notifications, planned for v0.4.0+
+ */
 export type NotificationHookInput = BaseHookInput & {
   hook_event_name: 'Notification';
   message: string;
@@ -94,7 +112,8 @@ export type SubagentStartHookInput = BaseHookInput & {
   hook_event_name: 'SubagentStart';
   subagent_id: string;
   subagent_type: string;
-  prompt: string;
+  /** Optional prompt/context for the subagent (extension beyond Claude Agent SDK) */
+  prompt?: string;
 };
 
 /** SubagentStop hook input */
@@ -103,7 +122,9 @@ export type SubagentStopHookInput = BaseHookInput & {
   stop_hook_active: boolean;
 };
 
-/** PreCompact hook input */
+/** PreCompact hook input
+ * ⏳ No auto trigger point — requires compact feature, planned for v0.4.0+
+ */
 export type PreCompactHookInput = BaseHookInput & {
   hook_event_name: 'PreCompact';
   trigger: 'manual' | 'auto';

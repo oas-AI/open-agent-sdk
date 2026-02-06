@@ -362,6 +362,141 @@ describe('HookManager', () => {
     });
   });
 
+  describe('UserPromptSubmit hook', () => {
+    test('should emit UserPromptSubmit event', async () => {
+      let receivedPrompt: string | undefined;
+
+      const callback: HookCallback = async (input) => {
+        if (input.hook_event_name === 'UserPromptSubmit') {
+          receivedPrompt = input.prompt;
+        }
+        return { continue: true };
+      };
+
+      manager.register('UserPromptSubmit', [{ hooks: [callback] }]);
+
+      const input: HookInput = {
+        session_id: 'test-session',
+        transcript_path: '',
+        cwd: '/home/user',
+        hook_event_name: 'UserPromptSubmit',
+        prompt: 'What files are in the directory?',
+      };
+
+      await manager.emit('UserPromptSubmit', input, undefined);
+
+      expect(receivedPrompt).toBe('What files are in the directory?');
+    });
+  });
+
+  describe('Stop hook', () => {
+    test('should emit Stop event', async () => {
+      let stopCalled = false;
+
+      const callback: HookCallback = async (input) => {
+        if (input.hook_event_name === 'Stop') {
+          stopCalled = true;
+        }
+        return { continue: false };
+      };
+
+      manager.register('Stop', [{ hooks: [callback] }]);
+
+      const input: HookInput = {
+        session_id: 'test-session',
+        transcript_path: '',
+        cwd: '/home/user',
+        hook_event_name: 'Stop',
+        stop_hook_active: true,
+      };
+
+      const results = await manager.emit('Stop', input, undefined);
+
+      expect(stopCalled).toBe(true);
+      expect(results).toHaveLength(1);
+      expect(results[0]).toEqual({ continue: false });
+    });
+
+    test('should support continue: true to request loop continuation', async () => {
+      const callback: HookCallback = async () => {
+        return { continue: true };
+      };
+
+      manager.register('Stop', [{ hooks: [callback] }]);
+
+      const input: HookInput = {
+        session_id: 'test-session',
+        transcript_path: '',
+        cwd: '/home/user',
+        hook_event_name: 'Stop',
+        stop_hook_active: true,
+      };
+
+      const results = await manager.emit('Stop', input, undefined);
+
+      expect(results).toHaveLength(1);
+      const result = results[0] as { continue: boolean };
+      expect(result.continue).toBe(true);
+    });
+  });
+
+  describe('Notification hook', () => {
+    test('should emit Notification event with message and title', async () => {
+      let receivedMessage: string | undefined;
+      let receivedTitle: string | undefined;
+
+      const callback: HookCallback = async (input) => {
+        if (input.hook_event_name === 'Notification') {
+          receivedMessage = input.message;
+          receivedTitle = input.title;
+        }
+      };
+
+      manager.register('Notification', [{ hooks: [callback] }]);
+
+      const input: HookInput = {
+        session_id: 'test-session',
+        transcript_path: '',
+        cwd: '/home/user',
+        hook_event_name: 'Notification',
+        message: 'Task completed successfully',
+        title: 'Done',
+      };
+
+      await manager.emit('Notification', input, undefined);
+
+      expect(receivedMessage).toBe('Task completed successfully');
+      expect(receivedTitle).toBe('Done');
+    });
+  });
+
+  describe('PreCompact hook', () => {
+    test('should emit PreCompact event', async () => {
+      let receivedTrigger: string | undefined;
+
+      const callback: HookCallback = async (input) => {
+        if (input.hook_event_name === 'PreCompact') {
+          receivedTrigger = input.trigger;
+        }
+      };
+
+      manager.register('PreCompact', [{ hooks: [callback] }]);
+
+      const input: HookInput = {
+        session_id: 'test-session',
+        transcript_path: '',
+        cwd: '/home/user',
+        hook_event_name: 'PreCompact',
+        trigger: 'auto',
+        custom_instructions: null,
+      };
+
+      await manager.emit('PreCompact', input, undefined);
+
+      expect(receivedTrigger).toBe('auto');
+    });
+  });
+
   describe('Error Handling', () => {
     test('should handle callback errors gracefully', async () => {
       const errorCallback: HookCallback = async () => {

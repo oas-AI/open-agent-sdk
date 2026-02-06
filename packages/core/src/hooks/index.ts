@@ -44,4 +44,8 @@ export {
   createSessionEndInput,
   createSubagentStartInput,
   createSubagentStopInput,
+  createNotificationInput,
+  createStopInput,
+  createPreCompactInput,
+  createUserPromptSubmitInput,
 } from './inputs';

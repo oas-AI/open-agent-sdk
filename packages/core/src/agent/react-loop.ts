@@ -27,7 +27,10 @@ import {
   createSessionEndInput,
   createPermissionRequestInput,
   createPostToolUseFailureInput,
+  createUserPromptSubmitInput,
+  createStopInput,
 } from '../hooks/inputs';
+import type { SyncHookJSONOutput } from '../hooks/types';
 import { PermissionManager } from '../permissions/manager';
 import type { PermissionMode, CanUseTool } from '../permissions/types';
 
@@ -160,6 +163,14 @@ export class ReActLoop {
     // Add user message
     messages.push(createUserMessage(userPrompt, this.sessionId, generateUUID()));
 
+    // Trigger UserPromptSubmit hook
+    const userPromptSubmitInput = createUserPromptSubmitInput(
+      this.sessionId,
+      this.config.cwd ?? process.cwd(),
+      userPrompt
+    );
+    await this.hookManager.emit('UserPromptSubmit', userPromptSubmitInput, undefined);
+
     let turnCount = 0;
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
@@ -232,7 +243,14 @@ export class ReActLoop {
           );
         }
       } else {
-        // No tool calls - we have the final answer
+        // No tool calls - agent produced final answer
+        // Trigger Stop hook — allows hooks to request continuation via { continue: true }
+        const shouldContinue = await this.emitStopHook();
+        if (shouldContinue) {
+          // Hook requested continuation — keep looping
+          continue;
+        }
+
         const textContent = assistantMessage.message.content.find((c) => c.type === 'text');
         return {
           result: textContent?.text ?? '',
@@ -276,6 +294,14 @@ export class ReActLoop {
       history.length > 0 ? 'resume' : 'startup'
     );
     await this.hookManager.emit('SessionStart', sessionStartInput, undefined);
+
+    // Trigger UserPromptSubmit hook
+    const userPromptSubmitInput = createUserPromptSubmitInput(
+      this.sessionId,
+      this.config.cwd ?? process.cwd(),
+      userPrompt
+    );
+    await this.hookManager.emit('UserPromptSubmit', userPromptSubmitInput, undefined);
 
     // Check if history already has a system message (metadata)
     const hasSystemInHistory = history.some((msg) => msg.type === 'system');
@@ -382,7 +408,14 @@ export class ReActLoop {
           yield { type: 'tool_result', message: toolResultMessage };
         }
       } else {
-        // No tool calls - we have the final answer
+        // No tool calls - agent produced final answer
+        // Trigger Stop hook — allows hooks to request continuation via { continue: true }
+        const shouldContinue = await this.emitStopHook();
+        if (shouldContinue) {
+          // Hook requested continuation — keep looping
+          continue;
+        }
+
         const textContent = assistantMessage.message.content.find((c) => c.type === 'text');
         const result = textContent?.text ?? '';
         yield { type: 'usage', usage: { input_tokens: totalInputTokens, output_tokens: totalOutputTokens } };
@@ -410,6 +443,39 @@ export class ReActLoop {
       'max_turns_reached'
     );
     await this.hookManager.emit('SessionEnd', sessionEndInput, undefined);
+  }
+
+  /**
+   * Get the hook manager instance
+   * Used for testing and inspection
+   */
+  getHookManager(): HookManager {
+    return this.hookManager;
+  }
+
+  /**
+   * Emit the Stop hook and check if any handler requests continuation.
+   * Returns true if the loop should continue (hook returned { continue: true }).
+   */
+  private async emitStopHook(): Promise<boolean> {
+    const stopInput = createStopInput(
+      this.sessionId,
+      this.config.cwd ?? process.cwd(),
+      true // stop_hook_active
+    );
+    const results = await this.hookManager.emit('Stop', stopInput, undefined);
+
+    // Check if any hook result requests continuation
+    for (const result of results) {
+      if (result && typeof result === 'object' && 'continue' in result) {
+        const syncResult = result as SyncHookJSONOutput;
+        if (syncResult.continue === true) {
+          logger.debug('[ReActLoop] Stop hook requested continuation');
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   private async callLLM(
