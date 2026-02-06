@@ -4,12 +4,6 @@ import { WebFetchTool } from '../../src/tools/web-fetch.js';
 import type { ToolContext } from '../../src/types/tools.js';
 import type { LLMProvider } from '../../src/providers/base.js';
 
-// Store original fetch
-const originalFetch = global.fetch;
-
-// Mock fetch for mocked tests
-const mockFetch = jest.fn();
-
 // Helper to create async iterable
 async function* createAsyncIterable<T>(items: T[]): AsyncIterable<T> {
   for (const item of items) {
@@ -76,8 +70,15 @@ describe('WebTools Mocked Integration', () => {
   let fetchTool: WebFetchTool;
   let context: ToolContext;
   let mockProvider: LLMProvider;
+  let mockFetch: jest.Mock;
+  let originalFetch: typeof global.fetch;
 
   beforeEach(() => {
+    // Save original fetch and create mock
+    originalFetch = global.fetch;
+    mockFetch = jest.fn();
+    global.fetch = mockFetch;
+
     searchTool = new WebSearchTool();
     fetchTool = new WebFetchTool();
     mockProvider = {
@@ -89,14 +90,10 @@ describe('WebTools Mocked Integration', () => {
       env: {},
       provider: mockProvider,
     };
-    // Set up mock fetch for mocked tests
-    global.fetch = mockFetch;
-    mockFetch.mockReset();
-    (mockProvider.chat as jest.Mock).mockReset();
   });
 
   afterEach(() => {
-    // Restore original fetch
+    // Always restore original fetch
     global.fetch = originalFetch;
   });
 

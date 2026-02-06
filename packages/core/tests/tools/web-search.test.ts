@@ -2,27 +2,27 @@ import { describe, it, expect, beforeEach, afterEach, jest } from 'bun:test';
 import { WebSearchTool } from '../../src/tools/web-search.js';
 import type { ToolContext } from '../../src/types/tools.js';
 
-// Store original fetch
-const originalFetch = global.fetch;
-
 describe('WebSearchTool', () => {
   let tool: WebSearchTool;
   let context: ToolContext;
   let fetchMock: jest.Mock;
+  let originalFetch: typeof global.fetch;
 
   beforeEach(() => {
+    // Save original fetch and create mock
+    originalFetch = global.fetch;
+    fetchMock = jest.fn();
+    global.fetch = fetchMock;
+
     tool = new WebSearchTool();
     context = {
       cwd: '/tmp',
       env: {},
     };
-    // Mock fetch
-    fetchMock = jest.fn();
-    global.fetch = fetchMock;
   });
 
   afterEach(() => {
-    // Restore original fetch
+    // Always restore original fetch
     global.fetch = originalFetch;
   });
 

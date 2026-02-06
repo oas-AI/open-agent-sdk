@@ -1,11 +1,7 @@
-import { describe, it, expect, beforeEach, jest } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, jest } from 'bun:test';
 import { WebFetchTool } from '../../src/tools/web-fetch.js';
 import type { ToolContext } from '../../src/types/tools.js';
 import type { LLMProvider } from '../../src/providers/base.js';
-
-// Mock fetch globally
-const mockFetch = jest.fn();
-global.fetch = mockFetch;
 
 // Helper to create async iterable
 async function* createAsyncIterable<T>(items: T[]): AsyncIterable<T> {
@@ -18,8 +14,15 @@ describe('WebFetchTool', () => {
   let tool: WebFetchTool;
   let context: ToolContext;
   let mockProvider: LLMProvider;
+  let mockFetch: jest.Mock;
+  let originalFetch: typeof global.fetch;
 
   beforeEach(() => {
+    // Save original fetch and create mock
+    originalFetch = global.fetch;
+    mockFetch = jest.fn();
+    global.fetch = mockFetch;
+
     tool = new WebFetchTool();
     mockProvider = {
       chat: jest.fn(),
@@ -31,8 +34,11 @@ describe('WebFetchTool', () => {
       provider: mockProvider,
       model: 'claude-sonnet',
     };
-    mockFetch.mockReset();
-    (mockProvider.chat as jest.Mock).mockReset();
+  });
+
+  afterEach(() => {
+    // Always restore original fetch
+    global.fetch = originalFetch;
   });
 
   describe('schema', () => {
