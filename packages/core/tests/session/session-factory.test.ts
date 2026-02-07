@@ -7,15 +7,7 @@ import { createSession, resumeSession } from '../../src/session/factory';
 import { Session, SessionState } from '../../src/session/session';
 import { InMemoryStorage, FileStorage, type SessionStorage, type SessionData } from '../../src/session/storage';
 import type { SDKMessage } from '../../src/types/messages';
-
-// Helper to generate UUID for tests
-function generateUUID(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
+import { generateUUID } from '../../src/utils/uuid';
 
 describe('createSession', () => {
   it('should create session with default options', async () => {

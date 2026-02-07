@@ -1,14 +1,7 @@
 import { describe, it, expect } from 'bun:test';
 import { AnthropicProvider } from '../../src/providers/anthropic';
 import { createUserMessage, type SDKMessage, type UUID } from '../../src/types/messages';
-
-function generateUUID(): UUID {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
+import { generateUUID } from '../../src/utils/uuid';
 
 describe('AnthropicProvider', () => {
   const sessionId = 'test-session-anthropic';

@@ -10,15 +10,7 @@ import {
 } from '../src/types/messages';
 import { createToolDefinition, type ToolDefinition } from '../src/types/tools';
 import { LLMProvider, type ProviderConfig, type LLMChunk } from '../src/providers/base';
-
-// Helper to generate test UUID
-function generateUUID(): UUID {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
+import { generateUUID } from '../src/utils/uuid';
 
 describe('Message Types', () => {
   const sessionId = 'test-session-123';
