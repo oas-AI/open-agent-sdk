@@ -29,7 +29,23 @@ Open Agent SDK 是一个用于构建 AI Agent 的 TypeScript 框架。它提供�
 ## 安装
 
 ```bash
-npm install @open-agent-sdk/core
+npm install open-agent-sdk
+```
+
+或指定包管理器：
+
+```bash
+# npm
+npm install open-agent-sdk
+
+# yarn
+yarn add open-agent-sdk
+
+# pnpm
+pnpm add open-agent-sdk
+
+# bun
+bun add open-agent-sdk
 ```
 
 **环境要求：**
@@ -42,7 +58,7 @@ npm install @open-agent-sdk/core
 ### 基础用法
 
 ```typescript
-import { prompt } from '@open-agent-sdk/core';
+import { prompt } from 'open-agent-sdk';
 
 const result = await prompt("当前目录有哪些文件？", {
   model: 'gpt-4o',
@@ -67,7 +83,7 @@ const result = await prompt("解释量子计算", {
 ### 基于会话的对话
 
 ```typescript
-import { createSession } from '@open-agent-sdk/core';
+import { createSession } from 'open-agent-sdk';
 
 const session = createSession({
   model: 'gpt-4o',
@@ -211,7 +227,7 @@ const result = await prompt("长时间运行的分析...", {
 
 ## 项目状态
 
-**当前版本：** v0.2.0
+**当前版本：** v0.1.0-alpha.0
 
 本项目正在公开开发中。关注我们的进展：
 
@@ -222,11 +238,11 @@ const result = await prompt("长时间运行的分析...", {
 
 | 版本 | 特性 | 状态 |
 |---------|----------|--------|
-| v0.1.0 | 基础 ReAct 循环、OpenAI 供应商、核心工具（Read/Write/Edit/Bash） | ✅ 已发布 |
-| v0.2.0 | 会话管理、多轮对话、Google 供应商、Glob/Grep 工具、AbortController | ✅ 已发布 |
-| v0.3.0 | WebSearch/WebFetch、子 Agent 系统、Hooks 框架、权限系统、MCP 支持 | ✅ 已发布 |
-| v0.4.0 | 额外钩子（Notification、Stop、PreCompact）、结构化输出、文件检查点、会话分叉 | 🚧 开发中 |
-| v1.0.0 | 稳定版本，与 Claude Agent SDK 完全兼容 | 📋 计划中 |
+| v0.1.0-alpha | 核心 ReAct 循环、17 个工具、3 个供应商、Session、Hooks、权限系统 | ✅ 已发布 |
+| v0.1.0-beta | 结构化输出、文件检查点、会话分叉增强 | 🚧 开发中 |
+| v0.1.0 | 稳定版本 | 📋 计划中 |
+| v0.2.0 | 浏览器自动化、Skill 系统、Query 类 | 📋 计划中 |
+| v1.0.0 | 完整的 Claude Agent SDK 兼容、Python SDK | 📋 计划中 |
 
 ## 开发
 

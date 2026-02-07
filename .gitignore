@@ -39,6 +39,7 @@ coverage/
 
 # External reference docs (not for version control)
 docs/dev/
+docs/release/
 
 # Legacy files
 claude-agent-sdk-ts*

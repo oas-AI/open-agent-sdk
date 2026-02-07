@@ -1,17 +1,24 @@
 {
   "name": "open-agent-sdk",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.0",
   "description": "Open source agent SDK compatible with Claude Agent SDK",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "cd packages/core && bun run build && mkdir -p ../../dist && cp -r dist/* ../../dist/",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage",
+    "typecheck": "cd packages/core && npx tsc --noEmit",
+    "prepare": "husky install",
+    "prepublishOnly": "bun run build"
+  },
   "workspaces": [
     "packages/*",
     "examples/*"
   ],
-  "scripts": {
-    "test": "bun test",
-    "test:coverage": "bun test --coverage",
-    "typecheck": "cd packages/core && npx tsc --noEmit",
-    "prepare": "husky install"
-  },
   "devDependencies": {
     "@types/bun": "^1.3.8",
     "@types/node": "^20.0.0",
@@ -24,5 +31,8 @@
   "dependencies": {
     "@ai-sdk/google": "^3.0.21",
     "ai": "^6.0.70"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

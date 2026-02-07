@@ -29,7 +29,23 @@ Open Agent SDK is a TypeScript framework for building AI agents. It provides a d
 ## Installation
 
 ```bash
-npm install @open-agent-sdk/core
+npm install open-agent-sdk
+```
+
+Or with specific package manager:
+
+```bash
+# npm
+npm install open-agent-sdk
+
+# yarn
+yarn add open-agent-sdk
+
+# pnpm
+pnpm add open-agent-sdk
+
+# bun
+bun add open-agent-sdk
 ```
 
 **Requirements:**
@@ -42,7 +58,7 @@ npm install @open-agent-sdk/core
 ### Basic Usage
 
 ```typescript
-import { prompt } from '@open-agent-sdk/core';
+import { prompt } from 'open-agent-sdk';
 
 const result = await prompt("What files are in the current directory?", {
   model: 'gpt-4o',
@@ -67,7 +83,7 @@ const result = await prompt("Explain quantum computing", {
 ### Session-Based Conversations
 
 ```typescript
-import { createSession } from '@open-agent-sdk/core';
+import { createSession } from 'open-agent-sdk';
 
 const session = createSession({
   model: 'gpt-4o',
@@ -210,7 +226,7 @@ Create or resume a persistent conversation session.
 
 ## Project Status
 
-**Current Version:** v0.2.0
+**Current Version:** v0.1.0-alpha.0
 
 This project is being developed in public. Follow our progress:
 
@@ -221,11 +237,11 @@ This project is being developed in public. Follow our progress:
 
 | Version | Features | Status |
 |---------|----------|--------|
-| v0.1.0 | Basic ReAct loop, OpenAI provider, core tools (Read/Write/Edit/Bash) | ✅ Released |
-| v0.2.0 | Session management, multi-turn conversations, Google provider, Glob/Grep tools, AbortController | ✅ Released |
-| v0.3.0 | WebSearch/WebFetch, Subagent system, Hooks framework, Permission system, MCP support | ✅ Released |
-| v0.4.0 | Additional hooks (Notification, Stop, PreCompact), structured outputs, file checkpointing, Session forking | 🚧 In Progress |
-| v1.0.0 | Stable release with full Claude Agent SDK compatibility | 📋 Planned |
+| v0.1.0-alpha | Core ReAct loop, 17 tools, 3 providers, Session, Hooks, Permissions | ✅ Released |
+| v0.1.0-beta | Structured outputs, File checkpointing, Session forking enhancements | 🚧 In Progress |
+| v0.1.0 | Stable release | 📋 Planned |
+| v0.2.0 | Browser automation, Skill system, Query class | 📋 Planned |
+| v1.0.0 | Full Claude Agent SDK compatibility, Python SDK | 📋 Planned |
 
 ## Development
 

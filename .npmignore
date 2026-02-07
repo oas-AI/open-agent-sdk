@@ -1,0 +1,28 @@
+# Source files
+packages/
+examples/
+docs/
+*.md
+!README.md
+
+# Test files
+tests/
+*.test.ts
+
+# Config files
+.github/
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Build artifacts (only dist/ should be published)
+node_modules/
+*.log
+.DS_Store
+
+# Development
+coverage/
+.nyc_output/
