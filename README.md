@@ -210,8 +210,8 @@ bun test --coverage
 # Type checking
 cd packages/core && npx tsc --noEmit
 
-# Run demo
-GEMINI_API_KEY=your-key bun examples/demo.ts
+# Run quickstart example
+bun examples/quickstart/test-basic.ts
 ```
 
 ## Why build this?

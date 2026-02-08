@@ -1,0 +1,19 @@
+{
+  "name": "@open-agent-sdk/quickstart-example",
+  "version": "0.1.0",
+  "description": "Quickstart examples for open-agent-sdk",
+  "type": "module",
+  "scripts": {
+    "test:basic": "bun test-basic.ts",
+    "test:session": "bun test-session.ts",
+    "test:tools": "bun test-tools.ts",
+    "test": "bun test-basic.ts && bun test-session.ts && bun test-tools.ts"
+  },
+  "dependencies": {
+    "open-agent-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  }
+}
