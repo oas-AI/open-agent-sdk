@@ -18,7 +18,8 @@ Open Agent SDK 是一个用于构建 AI Agent 的 TypeScript 框架。它提供�
 - **ReAct 循环** —— 观察-思考-行动的自主 Agent 循环
 - **内置工具** —— 文件操作（读/写/编辑）、Shell 执行、代码搜索（Glob/Grep）、网页搜索
 - **流式支持** —— 实时响应流和 Token 使用量追踪
-- **多供应商** —— 支持 OpenAI 和 Google Gemini
+- **多供应商** —— 支持 OpenAI、Google Gemini 和 Anthropic
+- **供应商可扩展** —— 通过简单接口添加自定义 Provider
 - **会话管理** —— 支持内存和文件存储的持久化对话
 - **权限系统** —— 4 种权限模式（default/acceptEdits/bypassPermissions/plan）
 - **Hooks 框架** —— 事件驱动的可扩展性（9 个钩子事件）
@@ -61,7 +62,7 @@ bun add open-agent-sdk
 import { prompt } from 'open-agent-sdk';
 
 const result = await prompt("当前目录有哪些文件？", {
-  model: 'gpt-4o',
+  model: 'your-model',
   apiKey: process.env.OPENAI_API_KEY,
 });
 
@@ -74,7 +75,7 @@ console.log(`Token: ${result.usage.input_tokens} 输入 / ${result.usage.output_
 
 ```typescript
 const result = await prompt("解释量子计算", {
-  model: 'gemini-2.0-flash',
+  model: 'your-model',
   provider: 'google',
   apiKey: process.env.GEMINI_API_KEY,
 });
@@ -86,7 +87,7 @@ const result = await prompt("解释量子计算", {
 import { createSession } from 'open-agent-sdk';
 
 const session = createSession({
-  model: 'gpt-4o',
+  model: 'your-model',
   apiKey: process.env.OPENAI_API_KEY,
 });
 
@@ -113,7 +114,7 @@ session.close();
 
 ```typescript
 const result = await prompt("分析代码库", {
-  model: 'gpt-4o',
+  model: 'your-model',
   apiKey: process.env.OPENAI_API_KEY,
   systemPrompt: "你是一个代码审查助手。",
   maxTurns: 15,
@@ -133,7 +134,7 @@ const abortController = new AbortController();
 setTimeout(() => abortController.abort(), 30000);
 
 const result = await prompt("长时间运行的分析...", {
-  model: 'gpt-4o',
+  model: 'your-model',
   apiKey: process.env.OPENAI_API_KEY,
   abortController,
 });
@@ -150,7 +151,7 @@ const result = await prompt("长时间运行的分析...", {
 - `options` (`PromptOptions`): 配置对象
   - `model` (`string`, **必需**): 模型标识符
   - `apiKey` (`string`): API 密钥（默认从环境变量读取）
-  - `provider` (`'openai' | 'google'`): 供应商（未指定时自动检测）
+  - `provider` (`'openai' | 'google' | 'anthropic'`): 供应商（未指定时自动检测）
   - `baseURL` (`string`): API 基础 URL（OpenAI 兼容）
   - `maxTurns` (`number`): 最大对话轮数（默认：10）
   - `allowedTools` (`string[]`): 允许使用的工具白名单
@@ -191,10 +192,11 @@ const result = await prompt("长时间运行的分析...", {
 
 ## 供应商支持
 
-| 供应商 | 状态 | 已测试模型 |
-|--------|------|-----------|
-| OpenAI | ✅ 已支持 | gpt-4o, gpt-4o-mini, gpt-4 |
-| Google Gemini | ✅ 已支持 | gemini-2.0-flash, gemini-1.5-flash |
+| 供应商 | 状态 |
+|--------|------|
+| OpenAI | ✅ 已支持 |
+| Google Gemini | ✅ 已支持 |
+| Anthropic | ✅ 已支持 |
 
 ## 架构
 

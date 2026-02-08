@@ -18,7 +18,8 @@ Open Agent SDK is a TypeScript framework for building AI agents. It provides a d
 - **ReAct Loop** — Observation-thought-action cycle for autonomous agents
 - **Built-in Tools** — File operations (read/write/edit), shell execution, code search (glob/grep), web search
 - **Streaming Support** — Real-time response streaming with token usage tracking
-- **Multi-Provider** — Works with OpenAI and Google Gemini
+- **Multi-Provider** — Works with OpenAI, Google Gemini, and Anthropic
+- **Provider Extensibility** — Add custom providers with a simple interface
 - **Session Management** — Persistent conversations with InMemory and File storage
 - **Permission System** — 4 permission modes (default/acceptEdits/bypassPermissions/plan)
 - **Hooks Framework** — Event-driven extensibility (9 hook events)
@@ -61,7 +62,7 @@ bun add open-agent-sdk
 import { prompt } from 'open-agent-sdk';
 
 const result = await prompt("What files are in the current directory?", {
-  model: 'gpt-4o',
+  model: 'your-model',
   apiKey: process.env.OPENAI_API_KEY,
 });
 
@@ -74,7 +75,7 @@ console.log(`Tokens: ${result.usage.input_tokens} in / ${result.usage.output_tok
 
 ```typescript
 const result = await prompt("Explain quantum computing", {
-  model: 'gemini-2.0-flash',
+  model: 'your-model',
   provider: 'google',
   apiKey: process.env.GEMINI_API_KEY,
 });
@@ -86,7 +87,7 @@ const result = await prompt("Explain quantum computing", {
 import { createSession } from 'open-agent-sdk';
 
 const session = createSession({
-  model: 'gpt-4o',
+  model: 'your-model',
   apiKey: process.env.OPENAI_API_KEY,
 });
 
@@ -113,7 +114,7 @@ session.close();
 
 ```typescript
 const result = await prompt("Analyze the codebase", {
-  model: 'gpt-4o',
+  model: 'your-model',
   apiKey: process.env.OPENAI_API_KEY,
   systemPrompt: "You are a code review assistant.",
   maxTurns: 15,
@@ -132,7 +133,7 @@ const abortController = new AbortController();
 setTimeout(() => abortController.abort(), 30000);
 
 const result = await prompt("Long running analysis...", {
-  model: 'gpt-4o',
+  model: 'your-model',
   apiKey: process.env.OPENAI_API_KEY,
   abortController,
 });
@@ -149,7 +150,7 @@ Execute a single prompt with the agent using the ReAct loop.
 - `options` (`PromptOptions`): Configuration object
   - `model` (`string`, **required**): Model identifier
   - `apiKey` (`string`): API key (defaults to env var)
-  - `provider` (`'openai' | 'google'`): Provider (auto-detected if not specified)
+  - `provider` (`'openai' | 'google' | 'anthropic'`): Provider (auto-detected if not specified)
   - `baseURL` (`string`): Base URL for API (OpenAI-compatible)
   - `maxTurns` (`number`): Maximum conversation turns (default: 10)
   - `allowedTools` (`string[]`): Allowed tools whitelist
@@ -190,10 +191,11 @@ Create or resume a persistent conversation session.
 
 ## Provider Support
 
-| Provider | Status | Models Tested |
-|----------|--------|---------------|
-| OpenAI | ✅ Supported | gpt-4o, gpt-4o-mini, gpt-4 |
-| Google Gemini | ✅ Supported | gemini-2.0-flash, gemini-1.5-flash |
+| Provider | Status |
+|----------|--------|
+| OpenAI | ✅ Supported |
+| Google Gemini | ✅ Supported |
+| Anthropic | ✅ Supported |
 
 ## Architecture
 
