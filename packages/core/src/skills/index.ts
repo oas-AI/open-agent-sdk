@@ -1,11 +1,17 @@
 /**
  * Skills module public API
  *
- * This module provides the Skills system for Open Agent SDK,
- * allowing users to define reusable skill templates.
+ * Skills are automatically discovered and loaded from:
+ * - ~/.claude/skills/ (personal skills)
+ * - .claude/skills/ (project skills)
+ *
+ * Users trigger skills via slash commands: /skill-name
+ *
+ * This module only exports types for TypeScript users.
+ * Implementation details are used internally by Session.
  */
 
-// Export all types
+// Export types only - implementation is internal
 export type {
   SkillFrontmatter,
   SkillDefinition,
@@ -15,40 +21,3 @@ export type {
   SkillParseResult,
   PreprocessorContext,
 } from './types';
-
-// Export parser functions
-export {
-  parseSkillFile,
-  parseFrontmatter,
-  extractContent,
-  validateFrontmatter,
-} from './parser';
-
-// Export loader
-export { SkillLoader } from './loader';
-
-// Export registry
-export { createSkillRegistry } from './registry';
-
-// Export preprocessor
-export {
-  preprocessContent,
-  createPreprocessorContext,
-} from './preprocessor';
-
-// Export matcher
-export {
-  exactMatch,
-  parseSkillCommand,
-  isSkillCommand,
-  type MatchResult,
-} from './matcher';
-
-// Export executor
-export {
-  executeSkill,
-  getSkillContent,
-  buildSkillSystemPrompt,
-  createSkillPreprocessorContext,
-  type SkillExecutionResult,
-} from './executor';
