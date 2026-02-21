@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import {
   exactMatch,
-  findByDescription,
   parseSkillCommand,
   isSkillCommand,
 } from '../../src/skills/matcher';
@@ -12,7 +11,6 @@ const mockSkills: SkillDefinition[] = [
     frontmatter: {
       name: 'commit',
       description: 'Generate a git commit message',
-      tags: ['git', 'version-control'],
     },
     content: 'Commit skill content',
     filePath: '/skills/commit.md',
@@ -22,7 +20,6 @@ const mockSkills: SkillDefinition[] = [
     frontmatter: {
       name: 'pr-description',
       description: 'Generate PR description from git diff',
-      tags: ['git', 'github'],
     },
     content: 'PR skill content',
     filePath: '/skills/pr.md',
@@ -32,7 +29,6 @@ const mockSkills: SkillDefinition[] = [
     frontmatter: {
       name: 'refactor',
       description: 'Refactor code to improve quality',
-      tags: ['code-quality'],
     },
     content: 'Refactor skill content',
     filePath: '/skills/refactor.md',
@@ -45,8 +41,6 @@ describe('exactMatch', () => {
     const result = exactMatch('commit', mockSkills);
     expect(result.matched).toBe(true);
     expect(result.skill?.frontmatter.name).toBe('commit');
-    expect(result.confidence).toBe(1.0);
-    expect(result.matchType).toBe('exact');
   });
 
   it('should be case-insensitive', () => {
@@ -65,42 +59,6 @@ describe('exactMatch', () => {
     const result = exactMatch('unknown', mockSkills);
     expect(result.matched).toBe(false);
     expect(result.skill).toBeUndefined();
-  });
-});
-
-describe('findByDescription', () => {
-  it('should match by exact description', () => {
-    const result = findByDescription('Generate a git commit message', mockSkills);
-    expect(result.matched).toBe(true);
-    expect(result.skill?.frontmatter.name).toBe('commit');
-  });
-
-  it('should match by partial description', () => {
-    const result = findByDescription('git commit', mockSkills);
-    expect(result.matched).toBe(true);
-    expect(result.skill?.frontmatter.name).toBe('commit');
-  });
-
-  it('should match by keywords', () => {
-    const result = findByDescription('pull request description', mockSkills);
-    expect(result.matched).toBe(true);
-    expect(result.skill?.frontmatter.name).toBe('pr-description');
-  });
-
-  it('should match by tags', () => {
-    const result = findByDescription('version control', mockSkills);
-    expect(result.matched).toBe(true);
-    expect(result.skill?.frontmatter.name).toBe('commit');
-  });
-
-  it('should return no match for unrelated query', () => {
-    const result = findByDescription('deploy to production', mockSkills);
-    expect(result.matched).toBe(false);
-  });
-
-  it('should handle empty query', () => {
-    const result = findByDescription('', mockSkills);
-    expect(result.matched).toBe(false);
   });
 });
 

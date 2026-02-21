@@ -81,7 +81,6 @@ class SkillRegistryImpl implements SkillRegistry {
         name: skill.frontmatter.name,
         description: skill.frontmatter.description,
         source: skill.source,
-        tags: skill.frontmatter.tags,
       });
     }
 

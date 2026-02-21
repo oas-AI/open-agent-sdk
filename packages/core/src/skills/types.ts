@@ -1,12 +1,12 @@
 /**
  * Skill system type definitions
  *
- * This module defines all types related to the Skill system,
- * including skill definitions, catalogs, frontmatter, and registry interfaces.
+ * Simplified version aligned with Claude Code behavior.
  */
 
 /**
  * Skill frontmatter parsed from YAML header in SKILL.md files
+ * Aligned with Claude Code: minimal required fields
  */
 export interface SkillFrontmatter {
   /** Skill name (unique identifier) */
@@ -15,46 +15,11 @@ export interface SkillFrontmatter {
   /** Human-readable description */
   description: string;
 
-  /** Optional version string */
-  version?: string;
-
-  /** Optional author information */
-  author?: string;
-
-  /** Optional tags for categorization */
-  tags?: string[];
-
-  /** Optional dependencies on other skills */
-  dependencies?: string[];
-
-  /** Optional default arguments */
-  defaults?: Record<string, string>;
-
-  /** Optional flag to indicate if skill is private (not shown in catalog) */
-  private?: boolean;
-
-  /** Disable model invocation for this skill */
-  disableModelInvocation?: boolean;
-
-  /** Whether this skill can be invoked by user */
-  userInvocable?: boolean;
-
   /** List of allowed tools for this skill */
   allowedTools?: string[];
 
   /** Model configuration for this skill */
   model?: string;
-
-  /** Additional context for the skill */
-  context?: string;
-
-  /** Agent configuration for this skill */
-  agent?: {
-    /** Agent name */
-    name?: string;
-    /** Custom instructions for the agent */
-    instructions?: string;
-  };
 }
 
 /**
@@ -70,7 +35,7 @@ export interface SkillDefinition {
   /** Full file path where the skill was loaded from */
   filePath: string;
 
-  /** Source type: 'personal' (from ~/.claude/skills/) or 'project' (from ./.claude/skills/) */
+  /** Source type: 'personal' or 'project' */
   source: 'personal' | 'project';
 
   /** Last modified timestamp */
@@ -79,7 +44,7 @@ export interface SkillDefinition {
 
 /**
  * Lightweight catalog item for listing available skills
- * This is a progressive disclosure pattern - minimal info for lists
+ * Progressive disclosure pattern - minimal info for lists
  */
 export interface SkillCatalogItem {
   /** Skill name */
@@ -90,9 +55,6 @@ export interface SkillCatalogItem {
 
   /** Source type */
   source: 'personal' | 'project';
-
-  /** Optional tags */
-  tags?: string[];
 }
 
 /**
@@ -133,17 +95,6 @@ export interface SkillRegistry {
 }
 
 /**
- * Parser options for parsing SKILL.md files
- */
-export interface SkillParserOptions {
-  /** Whether to validate required fields */
-  validate?: boolean;
-
-  /** Custom validation rules */
-  customValidators?: Array<(frontmatter: Record<string, unknown>) => string | undefined>;
-}
-
-/**
  * Result of parsing a SKILL.md file
  */
 export interface SkillParseResult {
@@ -159,41 +110,9 @@ export interface SkillParseResult {
 
 /**
  * Preprocessor context for argument substitution
+ * Simplified: only supports $ARGUMENTS (Claude Code compatible)
  */
 export interface PreprocessorContext {
-  /** Positional arguments ($0, $1, $2, etc.) */
-  args: string[];
-
-  /** Environment variables */
-  env: Record<string, string>;
-
   /** All arguments joined as string ($ARGUMENTS) */
   arguments: string;
-}
-
-/**
- * Skill loading error types
- */
-export type SkillLoadErrorType =
-  | 'FILE_NOT_FOUND'
-  | 'PARSE_ERROR'
-  | 'VALIDATION_ERROR'
-  | 'DUPLICATE_SKILL'
-  | 'IO_ERROR';
-
-/**
- * Skill loading error
- */
-export interface SkillLoadError {
-  /** Error type */
-  type: SkillLoadErrorType;
-
-  /** Error message */
-  message: string;
-
-  /** File path that caused the error */
-  filePath: string;
-
-  /** Original error (if any) */
-  cause?: Error;
 }

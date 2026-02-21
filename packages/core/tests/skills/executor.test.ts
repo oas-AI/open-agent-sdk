@@ -22,7 +22,7 @@ const mockSkills: SkillDefinition[] = [
       name: 'refactor',
       description: 'Refactor code',
     },
-    content: 'Please refactor the following code:\n\n$0',
+    content: 'Please refactor the following code:\n\n$ARGUMENTS',
     filePath: '/skills/refactor.md',
     source: 'project',
   },
@@ -48,7 +48,7 @@ describe('executeSkill', () => {
     expect(result.error).toContain('not found');
   });
 
-  it('should substitute positional arguments', () => {
+  it('should substitute $ARGUMENTS', () => {
     const result = executeSkill('/refactor myFunction', mockSkills);
     expect(result.executed).toBe(true);
     expect(result.content).toBe('Please refactor the following code:\n\nmyFunction');
@@ -94,17 +94,13 @@ describe('buildSkillSystemPrompt', () => {
 });
 
 describe('createSkillPreprocessorContext', () => {
-  it('should create context with session info', () => {
-    const context = createSkillPreprocessorContext(['arg1', 'arg2'], 'session-123', '/test');
-    expect(context.args).toEqual(['arg1', 'arg2']);
+  it('should create context with arguments', () => {
+    const context = createSkillPreprocessorContext(['arg1', 'arg2']);
     expect(context.arguments).toBe('arg1 arg2');
-    expect(context.env.CLAUDE_SESSION_ID).toBe('session-123');
-    expect(context.env.CLAUDE_CWD).toBe('/test');
   });
 
-  it('should include process env variables', () => {
-    const context = createSkillPreprocessorContext([], 'session', '/cwd');
-    expect(context.env.PATH).toBeDefined();
-    expect(context.env.HOME).toBeDefined();
+  it('should handle empty arguments', () => {
+    const context = createSkillPreprocessorContext([]);
+    expect(context.arguments).toBe('');
   });
 });

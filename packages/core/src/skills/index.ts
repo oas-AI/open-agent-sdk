@@ -12,11 +12,8 @@ export type {
   SkillCatalogItem,
   SkillLoaderOptions,
   SkillRegistry,
-  SkillParserOptions,
   SkillParseResult,
   PreprocessorContext,
-  SkillLoadError,
-  SkillLoadErrorType,
 } from './types';
 
 // Export parser functions
@@ -36,14 +33,12 @@ export { createSkillRegistry } from './registry';
 // Export preprocessor
 export {
   preprocessContent,
-  preprocessContentAsync,
   createPreprocessorContext,
 } from './preprocessor';
 
 // Export matcher
 export {
   exactMatch,
-  findByDescription,
   parseSkillCommand,
   isSkillCommand,
   type MatchResult,
@@ -55,8 +50,5 @@ export {
   getSkillContent,
   buildSkillSystemPrompt,
   createSkillPreprocessorContext,
-  shouldUseSubagent,
-  buildAgentDefinitionFromSkill,
-  executeSkillInSubagent,
   type SkillExecutionResult,
 } from './executor';

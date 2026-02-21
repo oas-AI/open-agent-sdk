@@ -10,7 +10,6 @@ import { join, extname, basename } from 'path';
 import type {
   SkillLoaderOptions,
   SkillDefinition,
-  SkillLoadError,
 } from './types';
 import { parseSkillFile } from './parser';
 
@@ -27,7 +26,7 @@ const LEGACY_COMMANDS_DIR = './.claude/commands';
  */
 export class SkillLoader {
   private options: Required<SkillLoaderOptions>;
-  private errors: SkillLoadError[] = [];
+  private errors: Array<{ type: string; message: string; filePath: string; cause?: Error }> = [];
 
   /**
    * Create a new SkillLoader instance
@@ -286,7 +285,7 @@ export class SkillLoader {
    *
    * @returns Array of load errors
    */
-  getErrors(): SkillLoadError[] {
+  getErrors(): Array<{ type: string; message: string; filePath: string; cause?: Error }> {
     return [...this.errors];
   }
 }
