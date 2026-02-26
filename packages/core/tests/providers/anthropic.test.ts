@@ -85,15 +85,26 @@ describe('AnthropicProvider', () => {
 
   it('should stream response from Anthropic API', async () => {
     const apiKey = process.env.ANTHROPIC_API_KEY;
+    const authToken = process.env.ANTHROPIC_AUTH_TOKEN;
+    const baseURL = process.env.ANTHROPIC_BASE_URL;
+    const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
 
-    if (!apiKey) {
-      console.log('Skipping: ANTHROPIC_API_KEY not set');
+    // Support both apiKey (standard Anthropic) and authToken (MiniMax compatible)
+    if (!apiKey && !authToken) {
+      console.log('Skipping: ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN not set');
       return;
+    }
+
+    console.log(`Using model: ${model}`);
+    if (baseURL) {
+      console.log(`Using baseURL: ${baseURL}`);
     }
 
     const provider = new AnthropicProvider({
       apiKey: apiKey,
-      model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514',
+      authToken: authToken,
+      baseURL: baseURL,
+      model: model,
     });
 
     const messages: SDKMessage[] = [
