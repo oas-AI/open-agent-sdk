@@ -20,7 +20,8 @@ const ANTHROPIC_PRICING: Record<string, { input: number; output: number }> = {
 };
 
 export interface AnthropicConfig extends ProviderConfig {
-  // Anthropic-specific config
+  /** Auth token for Bearer authentication (used by some compatible endpoints like MiniMax) */
+  authToken?: string;
 }
 
 export class AnthropicProvider extends LLMProvider {
@@ -30,6 +31,7 @@ export class AnthropicProvider extends LLMProvider {
     super(config);
     this.anthropic = createAnthropic({
       apiKey: config.apiKey,
+      authToken: config.authToken,
       baseURL: config.baseURL,
     });
   }
