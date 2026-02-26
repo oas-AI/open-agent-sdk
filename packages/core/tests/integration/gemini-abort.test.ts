@@ -15,10 +15,13 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { prompt } from '../../src/index';
 
-describe('Gemini AbortController Integration', () => {
+// Skip all tests if GEMINI_API_KEY is not available
+const apiKey = process.env.GEMINI_API_KEY;
+const hasApiKey = !!apiKey && apiKey.startsWith('AIza');
+const describeIfGoogle = hasApiKey ? describe : describe.skip;
+
+describeIfGoogle('Gemini AbortController Integration', () => {
   let tempDir: string;
-  const apiKey = process.env.GEMINI_API_KEY;
-  const hasApiKey = !!apiKey && apiKey.startsWith('AIza');
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'gemini-abort-test-'));
@@ -29,16 +32,11 @@ describe('Gemini AbortController Integration', () => {
   });
 
   it('should complete request without abort', async () => {
-    if (!hasApiKey) {
-      console.log('Skipping: GEMINI_API_KEY not set');
-      return;
-    }
-
     const controller = new AbortController();
 
     const result = await prompt('Say "Test passed" and nothing else', {
       model: 'gemini-2.0-flash',
-      apiKey: apiKey,
+      apiKey: apiKey!,
       provider: 'google',
       maxTurns: 1,
       abortController: controller,
@@ -53,11 +51,6 @@ describe('Gemini AbortController Integration', () => {
   }, 30000);
 
   it('should abort long-running request', async () => {
-    if (!hasApiKey) {
-      console.log('Skipping: GEMINI_API_KEY not set');
-      return;
-    }
-
     const controller = new AbortController();
 
     // Start the request
@@ -67,7 +60,7 @@ describe('Gemini AbortController Integration', () => {
       'Be very comprehensive and thorough.',
       {
         model: 'gemini-2.0-flash',
-        apiKey: apiKey,
+        apiKey: apiKey!,
         provider: 'google',
         maxTurns: 1,
         abortController: controller,
@@ -91,11 +84,6 @@ describe('Gemini AbortController Integration', () => {
   }, 30000);
 
   it('should abort multi-turn conversation', async () => {
-    if (!hasApiKey) {
-      console.log('Skipping: GEMINI_API_KEY not set');
-      return;
-    }
-
     const controller = new AbortController();
 
     // Ask a question that might trigger tool use (file operations)
@@ -103,7 +91,7 @@ describe('Gemini AbortController Integration', () => {
       `Please create a file at ${join(tempDir, 'test.txt')} with content "Hello from Gemini"`,
       {
         model: 'gemini-2.0-flash',
-        apiKey: apiKey,
+        apiKey: apiKey!,
         provider: 'google',
         maxTurns: 5,
         abortController: controller,
@@ -127,11 +115,6 @@ describe('Gemini AbortController Integration', () => {
   }, 30000);
 
   it('should handle immediate abort', async () => {
-    if (!hasApiKey) {
-      console.log('Skipping: GEMINI_API_KEY not set');
-      return;
-    }
-
     const controller = new AbortController();
 
     // Abort immediately before the request starts
@@ -139,7 +122,7 @@ describe('Gemini AbortController Integration', () => {
 
     const result = await prompt('Say "Hello"', {
       model: 'gemini-2.0-flash',
-      apiKey: apiKey,
+      apiKey: apiKey!,
       provider: 'google',
       maxTurns: 1,
       abortController: controller,
@@ -152,18 +135,13 @@ describe('Gemini AbortController Integration', () => {
   }, 30000);
 
   it('should measure time saved by abort', async () => {
-    if (!hasApiKey) {
-      console.log('Skipping: GEMINI_API_KEY not set');
-      return;
-    }
-
     // First, do a normal request to estimate time
     console.log('Measuring normal request time...');
     const normalResult = await prompt(
       'Write a 500 word essay about machine learning',
       {
         model: 'gemini-2.0-flash',
-        apiKey: apiKey,
+        apiKey: apiKey!,
         provider: 'google',
         maxTurns: 1,
       }
@@ -176,7 +154,7 @@ describe('Gemini AbortController Integration', () => {
       'Write a 500 word essay about machine learning',
       {
         model: 'gemini-2.0-flash',
-        apiKey: apiKey,
+        apiKey: apiKey!,
         provider: 'google',
         maxTurns: 1,
         abortController: controller,
