@@ -169,6 +169,44 @@ describe('InMemoryStorage', () => {
     expect(loaded?.messages[0].type).toBe('user');
     expect(loaded?.messages[1].type).toBe('assistant');
   });
+
+  it('append() should add message to in-memory session', async () => {
+    const sessionData: SessionData = {
+      id: 'test-session-append',
+      model: 'gpt-4o',
+      provider: 'openai',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      messages: [],
+      options: { model: 'gpt-4o' },
+    };
+    await storage.save(sessionData);
+
+    const msg: SDKMessage = {
+      type: 'user',
+      uuid: 'uuid-append-1',
+      session_id: 'test-session-append',
+      message: { role: 'user', content: 'hello' },
+      parent_tool_use_id: null,
+    };
+    await storage.append('test-session-append', msg);
+
+    const loaded = await storage.load('test-session-append');
+    expect(loaded?.messages).toHaveLength(1);
+    expect(loaded?.messages[0].uuid).toBe('uuid-append-1');
+  });
+
+  it('append() on non-existent session is a no-op', async () => {
+    // Should not throw
+    const msg: SDKMessage = {
+      type: 'user',
+      uuid: 'uuid-noop',
+      session_id: 'does-not-exist',
+      message: { role: 'user', content: 'hello' },
+      parent_tool_use_id: null,
+    };
+    await expect(storage.append('does-not-exist', msg)).resolves.toBeUndefined();
+  });
 });
 
 import { generateUUID } from '../../src/utils/uuid';
@@ -361,6 +399,61 @@ describe('FileStorage', () => {
     const list = await storage.list();
     expect(list).toContain(id1);
     expect(list).toContain(id2);
+  });
+
+  it('append() should add a new line to the JSONL file without rewriting it', async () => {
+    const sessionId = generateUUID();
+    await storage.save({
+      id: sessionId,
+      model: 'gpt-4o',
+      provider: 'openai',
+      createdAt: 1000,
+      updatedAt: 1000,
+      messages: [],
+      options: { model: 'gpt-4o' },
+    });
+
+    const msg1: SDKMessage = {
+      type: 'user',
+      uuid: 'uuid-a1',
+      session_id: sessionId,
+      message: { role: 'user', content: 'hi' },
+      parent_tool_use_id: null,
+    };
+    const msg2: SDKMessage = {
+      type: 'assistant',
+      uuid: 'uuid-a2',
+      session_id: sessionId,
+      message: { role: 'assistant', content: [{ type: 'text', text: 'hello' }] },
+      parent_tool_use_id: null,
+    };
+
+    await storage.append(sessionId, msg1);
+    await storage.append(sessionId, msg2);
+
+    // load() should reconstruct both messages
+    const loaded = await storage.load(sessionId);
+    expect(loaded?.messages).toHaveLength(2);
+    expect(loaded?.messages[0].uuid).toBe('uuid-a1');
+    expect(loaded?.messages[1].uuid).toBe('uuid-a2');
+
+    // File on disk: 1 header + 2 messages = 3 lines
+    const content = await Bun.file(`${testDir}/${sessionId}.jsonl`).text();
+    const lines = content.split('\n').filter((l) => l.trim() !== '');
+    expect(lines).toHaveLength(3);
+  });
+
+  it('append() on non-existent session is a no-op (does not throw)', async () => {
+    const fakeId = generateUUID();
+    const msg: SDKMessage = {
+      type: 'user',
+      uuid: 'uuid-noop',
+      session_id: fakeId,
+      message: { role: 'user', content: 'test' },
+      parent_tool_use_id: null,
+    };
+    await expect(storage.append(fakeId, msg)).resolves.toBeUndefined();
+    expect(await storage.exists(fakeId)).toBe(false);
   });
 });
 
