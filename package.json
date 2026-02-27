@@ -9,7 +9,8 @@
     "test:coverage": "bun test --coverage",
     "typecheck": "cd packages/core && npx tsc --noEmit",
     "prepare": "husky install",
-    "publish:core": "cd packages/core && npm publish --access public"
+    "publish:core": "cd packages/core && npm publish --access public",
+    "publish:benchmark": "bun scripts/publish-benchmark.ts"
   },
   "workspaces": [
     "packages/*",
