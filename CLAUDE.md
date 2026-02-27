@@ -1,39 +1,40 @@
 # Open Agent SDK - Claude Code Project Context
 
-## Quick Navigation
+## Project Overview
 
-| Document | Content |
+Open Agent SDK is a TypeScript SDK for building AI agents with tool use, ReAct loop, and multi-provider support. Architecture follows **core + extensions** pattern (see [ADR 001](docs/adr/001-monorepo-structure.md)).
+
+## Navigation Hub
+
+| Document | Purpose |
 |----------|---------|
-| [Architecture Decision Records](docs/adr/) | Technical decision background |
 | [Requirements](REQUIREMENTS.md) | Feature requirements, version planning |
 | [Gap Analysis](docs/gap-analysis.md) | Comparison with Claude Agent SDK |
+| [Architecture Decisions](docs/adr/) | Technical decision records |
+| [Git Workflow](docs/workflows/git-workflow.md) | Worktrees, branching, PR process |
+| [Testing Guide](docs/workflows/testing-guide.md) | TDD guidelines, environment setup |
 
 ## Project Structure
 
 ```
 open-agent-sdk/
-├── CLAUDE.md              # This file: project context entry
-├── README.md              # Project documentation
+├── CLAUDE.md              # This file: Claude Code context
 ├── package.json           # Bun workspaces configuration
 ├── REQUIREMENTS.md        # Product requirements
 └── packages/
-    └── core/              # Core SDK
+    └── core/              # Core SDK package
         ├── src/
-        │   ├── index.ts      # Public API
-        │   ├── types/        # Message, tool types
-        │   ├── tools/        # Read/Write/Edit/Bash/Glob/Grep/WebSearch/WebFetch/Task
-        │   ├── providers/    # OpenAI/Google providers
+        │   ├── index.ts      # Public API exports
+        │   ├── types/        # Message, tool, provider types
+        │   ├── tools/        # Tool implementations
+        │   ├── providers/    # LLM provider adapters
         │   ├── agent/        # ReAct loop, subagent system
         │   ├── session/      # Session management
         │   ├── permissions/  # Permission system
-        │   ├── skills/       # Skill system (auto-load from ~/.claude/skills/)
+        │   ├── skills/       # Skill loading system
         │   └── hooks/        # Hooks framework
-        └── tests/
+        └── tests/            # Test files (mirror src/ structure)
 ```
-
-## Architecture Decisions
-
-The project uses a **core + extensions** packaging strategy. See [ADR 001](docs/adr/001-monorepo-structure.md) for details.
 
 ## Tech Stack
 
@@ -46,135 +47,107 @@ The project uses a **core + extensions** packaging strategy. See [ADR 001](docs/
 
 ```bash
 bun install          # Install dependencies
-bun test             # Run tests
-bun test --coverage  # Run tests with coverage
-bun run build        # Build
+bun test             # Run all tests
+bun test --coverage  # Run tests with coverage report
+bun run build        # Build packages
+bun run typecheck    # Type checking without emit
 ```
+
+## Key Decision Rules
+
+### When to Use TDD
+
+**Use TDD (tests first) for:**
+- Core agent logic (ReAct loop, tool execution)
+- New tool implementations
+- Provider integrations
+- Permission system changes
+
+**Tests after implementation OK for:**
+- Simple utility functions
+- Documentation updates
+- Configuration changes
+- Bug fixes with obvious solutions
+
+### When to Use Git Worktrees
+
+**Recommended for:**
+- All feature development
+- Refactoring work
+- Experimental changes
+
+**Optional for:**
+- Typo fixes in docs
+- Single-line bug fixes
+- Emergency hotfixes
+
+**See [Git Workflow Guide](docs/workflows/git-workflow.md) for detailed usage.**
+
+### Commit Standards
+
+- **Format**: Conventional Commits (`type(scope): description`)
+- **Frequency**: Commit after each logical unit of work
+- **Language**: English for all commit messages and PR content
+- **Guideline**: Each commit should be self-contained (tests pass)
+
+**See [Git Workflow Guide](docs/workflows/git-workflow.md) for examples and PR guidelines.**
 
 ## Coding Standards
 
-- **TDD**: Write tests first, then implementation
-- **Test Directory**: Test files go in `tests/` directory (sibling to `src/`), e.g., `tests/permissions/manager.test.ts`
-- **Coverage**: > 80%
-- **Types**: All public APIs must have complete types
-- **Structure**: `types/` (types), `tools/` (tools), `providers/` (providers), `agent/` (core logic), `session/` (session management), `permissions/` (permission system), `hooks/` (hooks framework)
+### Code Organization
 
-## Workflow Standards
+- **Test Location**: `tests/` directory (sibling to `src/`), mirroring source structure
+  - Example: `src/permissions/manager.ts` → `tests/permissions/manager.test.ts`
+- **Directory Structure**: Follow existing patterns in `src/`
+  - `types/` - Type definitions and interfaces
+  - `tools/` - Tool implementations
+  - `providers/` - LLM provider adapters
+  - `agent/` - Core agent logic
+  - `session/` - Session management
+  - `permissions/` - Permission system
+  - `skills/` - Skill loading and execution
+  - `hooks/` - Hooks framework
 
-### Development Workflow
+### Type Safety
 
-**CRITICAL: Always use git worktrees for new work**
+- **Public APIs**: Must have complete type definitions
+- **Internal Code**: Leverage TypeScript strict mode
+- **Type Exports**: Export types from `src/types/index.ts`
 
-1. **Start new work in a worktree + new branch**
-   ```bash
-   # Create worktree with new branch
-   git worktree add .worktrees/<feature-name> -b <branch-name>
-   cd .worktrees/<feature-name>
+### Test Coverage
 
-   # Or use EnterWorktree tool in Claude Code
-   ```
+- **Target**: > 80% coverage
+- **Focus**: Core logic, edge cases, error handling
+- **Integration Tests**: Require `.env` file with API keys (see Testing Guide)
 
-2. **Never work directly on main branch**
-   - Always create a feature branch for any changes
-   - Main branch should only be updated via PR merges
+## Testing with LLM APIs
 
-3. **Make incremental commits**
-   - ❌ **Bad**: Complete entire feature → single commit
-   - ✅ **Good**: Break work into logical steps with meaningful commits
-
-   **Example of good commit sequence:**
-   ```bash
-   git commit -m "feat(core): add basic provider interface"
-   git commit -m "feat(core): implement OpenAI provider"
-   git commit -m "test(core): add provider integration tests"
-   git commit -m "docs(core): document provider usage"
-   ```
-
-4. **Commit guidelines**
-   - Commit after completing each logical unit of work
-   - Each commit should be self-contained and working (tests pass)
-   - Write clear commit messages following conventional commits format
-   - Commit frequently to preserve work and enable easy rollback
-
-### Pull Request Guidelines
-
-- **Language**: Use English for all PR titles and descriptions
-  - PR title format: `<type>(<scope>): <description>` (e.g., `refactor(tests): remove low-value mock tests`)
-  - PR description should include: Summary, Changes, Metrics (if applicable), Verification checklist
-
-### Git Branch Management
-
-**Before creating a PR, always check:**
+**Environment Setup:**
+Tests that call real LLM APIs require environment variables from `.env` file:
 
 ```bash
-# Check if this branch already has a merged PR
-gh pr view <branch-name> --json state,mergedAt,number,title
+# Run tests with environment variables
+env $(cat .env | xargs) bun test
 
-# Or check all PRs for this branch
-gh pr list --head <branch-name> --state all
+# Run specific test file
+env $(cat .env | xargs) bun test tests/providers/openai.test.ts
 ```
 
-**Rules:**
+**See [Testing Guide](docs/workflows/testing-guide.md) for mock vs. integration testing guidelines.**
 
-1. **Never push to a branch with a merged PR**
-   - If PR is already merged (`"mergedAt": "..."`), create a new branch from `main`
-   - Example: `git checkout -b fix/phase-1.2-e2e-skip-logic`
+## Provider Compatibility
 
-2. **Workflow for continuing work after PR merge:**
-   ```bash
-   git checkout main
-   git pull origin main
-   git worktree add .worktrees/<new-feature> -b <new-branch-name>
-   cd .worktrees/<new-feature>
-   ```
+### Google Provider (Gemini)
+- ✅ Fully compatible with Google native API
+- Default model: `gemini-3-flash-preview`
 
-3. **Keep PRs focused and independent**
-   - Each PR should contain a single logical change
-   - Don't stack unrelated changes on the same branch after merge
+### OpenAI Provider
+- ✅ Works with OpenAI API
+- ✅ Compatible with DeepSeek, OpenRouter (via `baseURL`)
+- ⚠️ Gemini's OpenAI-compatible endpoint has limitations (missing `index` field in tool calls)
+  - **Workaround**: Use Google Provider for Gemini models
 
-4. **Verify branch status before pushing**
-   - Run `git status` to confirm you're on the correct branch
-   - Run `gh pr view` to check if branch already has an open/merged PR
+## Related References
 
-5. **Clean up after PR merge**
-   ```bash
-   # After PR is merged, remove worktree
-   git worktree remove .worktrees/<feature-name>
-   git branch -d <branch-name>
-   ```
-
-## Testing with LLM API
-
-When running tests that require LLM API access:
-- Load environment variables from the `.env` file (contains API keys and proxy configurations)
-- This applies to running specific tests or the full test suite
-
-```bash
-# Example: Run tests with env variables
-env $(cat /path/to/.env | xargs) bun test
-
-# Example: Run specific test file
-env $(cat /path/to/.env | xargs) bun test tests/providers/openai.test.ts
-```
-
-## Related Documents
-
-- [Requirements](REQUIREMENTS.md) - Complete feature requirements
-- [Claude Agent SDK Reference](docs/dev/claude-agent-sdk-ts.md) - Reference product API
-- [Claude Agent SDK V2 Preview](docs/dev/claude-agent-sdk-ts-v2/) - V2 interface design reference
-- [Gap Analysis](docs/gap-analysis.md) - Feature gap analysis with Claude Agent SDK
-
-## Provider Compatibility Notes
-
-1. **Google Provider (Gemini)**
-   - Works correctly with Google native API
-   - Default model: `gemini-3-flash-preview`
-
-2. **OpenAI Provider with Gemini OpenAI-Compatible Endpoint**
-   - **Status**: Partially compatible
-   - **Issue**: Gemini's OpenAI-compatible endpoint returns tool calls without the `index` field required by Vercel AI SDK
-   - **Workaround**: Use Google Provider for Gemini models
-
-3. **OpenAI Provider with Other Compatible Endpoints**
-   - Should work with DeepSeek, OpenRouter, etc.
-   - Automatically uses Chat Completions API when `baseURL` is configured
+- [Claude Agent SDK TypeScript](docs/dev/claude-agent-sdk-ts.md) - Reference product API
+- [Claude Agent SDK V2 Preview](docs/dev/claude-agent-sdk-ts-v2/) - V2 interface design
