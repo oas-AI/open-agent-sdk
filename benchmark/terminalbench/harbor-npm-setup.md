@@ -51,7 +51,7 @@ Harbor 安装脚本
 
 ### 2. Harbor 安装脚本优化
 
-**文件：** `benchmark/harbor/install-open-agent-sdk.sh.j2`
+**文件：** `benchmark/terminalbench/harbor/install-open-agent-sdk.sh.j2`
 
 **更改：**
 ```bash
@@ -67,7 +67,7 @@ bun add -g @open-agent-sdk/cli
 
 ### 3. Harbor Agent 适配器更新
 
-**文件：** `benchmark/harbor/agent.py`
+**文件：** `benchmark/terminalbench/harbor/agent.py`
 
 **更改：**
 ```python
@@ -84,7 +84,7 @@ cmd = f'{CLI_COMMAND} -p "{escaped}" ...'
 
 - **`docs/PUBLISHING.md`**: npm 发布完整流程
 - **`scripts/test-npm-install.sh`**: 本地测试安装流程
-- **`benchmark/harbor/README.md`**: Harbor 使用文档（已更新）
+- **`benchmark/terminalbench/harbor/README.md`**: Harbor 使用文档（已更新）
 
 ## 发布流程
 
@@ -131,7 +131,7 @@ oas --help
 HARBOR_AGENTS_DIR=$(python -c "import harbor; print(harbor.__path__[0])")/agents/installed
 
 # 创建符号链接
-ln -s $(pwd)/benchmark/harbor/agent.py \
+ln -s $(pwd)/benchmark/terminalbench/harbor/agent.py \
   $HARBOR_AGENTS_DIR/open_agent_sdk.py
 ```
 

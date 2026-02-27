@@ -1,6 +1,6 @@
 # 快速开始：发布到 npm
 
-本文档提供最简化的发布流程。详细文档见 [HARBOR_NPM_SETUP.md](./HARBOR_NPM_SETUP.md)。
+本文档提供最简化的发布流程。详细文档见 [harbor-npm-setup.md](./harbor-npm-setup.md)。
 
 ## 1. 准备工作
 
@@ -72,7 +72,7 @@ bun remove -g @open-agent-sdk/cli
 pip install harbor
 
 # 注册 agent
-ln -s $(pwd)/benchmark/harbor/agent.py \
+ln -s $(pwd)/benchmark/terminalbench/harbor/agent.py \
   $(python -c "import harbor; print(harbor.__path__[0])")/agents/installed/open_agent_sdk.py
 
 # 设置 API Key
@@ -168,6 +168,6 @@ harbor jobs start --help
 
 ## 完整文档
 
-- [HARBOR_NPM_SETUP.md](./HARBOR_NPM_SETUP.md) - 完整设置指南
-- [docs/PUBLISHING.md](./docs/PUBLISHING.md) - 详细发布流程
-- [benchmark/harbor/README.md](./benchmark/harbor/README.md) - Harbor 使用文档
+- [harbor-npm-setup.md](./harbor-npm-setup.md) - 完整设置指南
+- [docs/PUBLISHING.md](../../docs/PUBLISHING.md) - 详细发布流程
+- [harbor/README.md](./harbor/README.md) - Harbor 使用文档
