@@ -17,7 +17,7 @@ export PATH="$HOME/.bun/bin:$PATH"
 
 # Clone repository (shallow clone for faster installation)
 echo "Cloning open-agent-sdk from GitHub..."
-git clone --depth 1 https://github.com/Octane0411/open-agent-sdk.git /tmp/open-agent-sdk
+git clone --depth 1 --branch feat/harbor-local-test https://github.com/Octane0411/open-agent-sdk.git /tmp/open-agent-sdk
 
 # Build packages locally
 echo "Building packages..."
