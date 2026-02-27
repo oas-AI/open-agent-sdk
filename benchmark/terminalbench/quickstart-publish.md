@@ -102,7 +102,7 @@ Optimize Harbor benchmark adapter to use npm packages instead of GitHub tarball 
 - Update CLI package.json for npm publishing
 - Optimize Harbor install script to use `bun add -g @open-agent-sdk/cli`
 - Update Harbor agent.py to use global `oas` command
-- Add comprehensive documentation (PUBLISHING.md, HARBOR_NPM_SETUP.md)
+- Add comprehensive documentation (harbor-npm-setup.md, quickstart-publish.md)
 - Add test script for local verification
 
 ## Benefits
@@ -169,5 +169,5 @@ harbor jobs start --help
 ## 完整文档
 
 - [harbor-npm-setup.md](./harbor-npm-setup.md) - 完整设置指南
-- [docs/PUBLISHING.md](../../docs/PUBLISHING.md) - 详细发布流程
+- `docs/dev/PUBLISHING.md` - 详细发布流程（开发文档，不在 git 中）
 - [harbor/README.md](./harbor/README.md) - Harbor 使用文档

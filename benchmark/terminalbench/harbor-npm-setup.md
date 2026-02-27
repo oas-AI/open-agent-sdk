@@ -82,7 +82,7 @@ cmd = f'{CLI_COMMAND} -p "{escaped}" ...'
 
 ### 4. 新增文档
 
-- **`docs/PUBLISHING.md`**: npm 发布完整流程
+- **`docs/dev/PUBLISHING.md`**: npm 发布完整流程
 - **`scripts/test-npm-install.sh`**: 本地测试安装流程
 - **`benchmark/terminalbench/harbor/README.md`**: Harbor 使用文档（已更新）
 
@@ -166,7 +166,7 @@ harbor run -d terminal-bench@2.0 \
    - 提升 Daytona 兼容性
 
 4. **发布到 npm**
-   - 按照 `docs/PUBLISHING.md` 流程发布
+   - 按照 `docs/dev/PUBLISHING.md` 流程发布
    - 先发布 `open-agent-sdk`
    - 再发布 `@open-agent-sdk/cli`
 
