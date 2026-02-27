@@ -126,11 +126,11 @@ class OpenAgentSDKAgentLocal(BaseInstalledAgent):
             f'{CLI_COMMAND} -p "{escaped}" --model {model} --output-format json'
         ]
 
-        # For MiniMax, add --base-url flag
+        # For MiniMax, add --provider and --base-url flags
         if is_minimax_model(model) and "ANTHROPIC_BASE_URL" in env_vars:
             base_url = env_vars["ANTHROPIC_BASE_URL"]
-            # Insert --base-url before the -p flag
-            cmd_parts[2] = f'{CLI_COMMAND} --base-url {base_url} -p "{escaped}" --model {model} --output-format json'
+            # Use anthropic provider with custom base URL
+            cmd_parts[2] = f'{CLI_COMMAND} --provider anthropic --base-url {base_url} -p "{escaped}" --model {model} --output-format json'
 
         return [
             ExecInput(
