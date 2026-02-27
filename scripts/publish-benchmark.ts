@@ -16,6 +16,7 @@
  *   bun scripts/publish-benchmark.ts                    # 真实发布
  *   bun scripts/publish-benchmark.ts --dry-run          # 测试模式（不真发布）
  *   bun scripts/publish-benchmark.ts --skip-tests       # 跳过测试（不推荐）
+ *   bun scripts/publish-benchmark.ts --otp=123456       # 使用 OTP（2FA）
  *   bun scripts/publish-benchmark.ts --dry-run --skip-tests  # 测试模式 + 跳过测试
  */
 
@@ -30,6 +31,10 @@ const CLI_PKG_PATH = join(ROOT_DIR, 'packages/cli/package.json');
 // 检查是否为 dry-run 模式
 const DRY_RUN = process.argv.includes('--dry-run');
 const SKIP_TESTS = process.argv.includes('--skip-tests');
+
+// 提取 OTP 参数
+const OTP_ARG = process.argv.find(arg => arg.startsWith('--otp='));
+const OTP = OTP_ARG ? OTP_ARG.split('=')[1] : undefined;
 
 // 颜色输出
 const colors = {
@@ -190,15 +195,20 @@ async function main() {
   // 6. 发布 SDK
   log('\n📤 Publishing SDK to npm...', 'blue');
   if (DRY_RUN) {
-    log('   [DRY RUN] Would run: cd packages/core && npm publish --access public --tag canary', 'yellow');
+    const otpFlag = OTP ? ` --otp=${OTP}` : '';
+    log(`   [DRY RUN] Would run: cd packages/core && npm publish --access public --tag canary${otpFlag}`, 'yellow');
     log(`   ✓ [DRY RUN] Would publish open-agent-sdk@${canaryVersion}`, 'green');
   } else {
     try {
-      execCommand('cd packages/core && npm publish --access public --tag canary', 'Publishing open-agent-sdk');
+      const otpFlag = OTP ? ` --otp=${OTP}` : '';
+      execCommand(`cd packages/core && npm publish --access public --tag canary${otpFlag}`, 'Publishing open-agent-sdk');
       log(`   ✓ Published open-agent-sdk@${canaryVersion}`, 'green');
     } catch (error) {
       log('\n❌ Failed to publish SDK. Check your npm credentials.', 'red');
       log('   Run: npm login', 'yellow');
+      if (!OTP) {
+        log('   If you have 2FA enabled, use: --otp=123456', 'yellow');
+      }
       process.exit(1);
     }
   }
@@ -224,14 +234,19 @@ async function main() {
   // 9. 发布 CLI
   log('\n📤 Publishing CLI to npm...', 'blue');
   if (DRY_RUN) {
-    log('   [DRY RUN] Would run: cd packages/cli && npm publish --access public --tag canary', 'yellow');
+    const otpFlag = OTP ? ` --otp=${OTP}` : '';
+    log(`   [DRY RUN] Would run: cd packages/cli && npm publish --access public --tag canary${otpFlag}`, 'yellow');
     log(`   ✓ [DRY RUN] Would publish @open-agent-sdk/cli@${canaryVersion}`, 'green');
   } else {
     try {
-      execCommand('cd packages/cli && npm publish --access public --tag canary', 'Publishing @open-agent-sdk/cli');
+      const otpFlag = OTP ? ` --otp=${OTP}` : '';
+      execCommand(`cd packages/cli && npm publish --access public --tag canary${otpFlag}`, 'Publishing @open-agent-sdk/cli');
       log(`   ✓ Published @open-agent-sdk/cli@${canaryVersion}`, 'green');
     } catch (error) {
       log('\n❌ Failed to publish CLI', 'red');
+      if (!OTP) {
+        log('   If you have 2FA enabled, use: --otp=123456', 'yellow');
+      }
       process.exit(1);
     }
   }

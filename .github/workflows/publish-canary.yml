@@ -1,0 +1,136 @@
+name: Publish Canary (Benchmark)
+
+on:
+  # 手动触发
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip tests (useful during test refactoring)'
+        type: boolean
+        default: false
+        required: false
+
+jobs:
+  publish-canary:
+    name: Publish Canary to npm
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Generate canary version
+        id: version
+        run: |
+          # 生成 canary 版本号
+          BASE_VERSION=$(node -p "require('./packages/core/package.json').version.split('-')[0]")
+          TIMESTAMP=$(date -u +%Y%m%d%H%M)
+          CANARY_VERSION="${BASE_VERSION}-canary.${TIMESTAMP}"
+          echo "version=$CANARY_VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Generated canary version: $CANARY_VERSION"
+
+      - name: Update package versions
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # 更新 SDK 版本
+          cd packages/core
+          npm version $VERSION --no-git-tag-version
+          cd ../..
+
+          # 更新 CLI 版本和依赖
+          cd packages/cli
+          npm version $VERSION --no-git-tag-version
+          npm pkg set dependencies.open-agent-sdk=$VERSION
+          cd ../..
+
+          echo "✅ Updated package versions to $VERSION"
+
+      - name: Run tests
+        if: ${{ !inputs.skip_tests }}
+        run: |
+          echo "🧪 Running tests..."
+          cd packages/core
+          bun test
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+
+      - name: Skip tests (warning)
+        if: ${{ inputs.skip_tests }}
+        run: |
+          echo "⚠️  Skipping tests as requested"
+
+      - name: Build SDK
+        run: |
+          echo "🔨 Building SDK..."
+          cd packages/core
+          bun run build
+
+      - name: Publish SDK to npm
+        run: |
+          echo "📤 Publishing open-agent-sdk@${{ steps.version.outputs.version }}..."
+          cd packages/core
+          npm publish --access public --tag canary
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Wait for npm registry
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "⏳ Waiting for npm to index open-agent-sdk@$VERSION..."
+
+          for i in {1..20}; do
+            if npm view open-agent-sdk@$VERSION version 2>/dev/null; then
+              echo "✅ Package is available on npm"
+              exit 0
+            fi
+            echo "Attempt $i/20: waiting 10 seconds..."
+            sleep 10
+          done
+
+          echo "⚠️  Timeout waiting for npm, but continuing..."
+
+      - name: Publish CLI to npm
+        run: |
+          echo "📤 Publishing @open-agent-sdk/cli@${{ steps.version.outputs.version }}..."
+          cd packages/cli
+          npm publish --access public --tag canary
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Summary
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "## 🎉 Canary Published!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Published Packages" >> $GITHUB_STEP_SUMMARY
+          echo "- \`open-agent-sdk@$VERSION\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`@open-agent-sdk/cli@$VERSION\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Install on Daytona" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "npm install -g @open-agent-sdk/cli@$VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "# Or install latest canary:" >> $GITHUB_STEP_SUMMARY
+          echo "npm install -g @open-agent-sdk/cli@canary" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Wait 1-2 minutes for full npm indexing" >> $GITHUB_STEP_SUMMARY
+          echo "2. Install on Daytona using the command above" >> $GITHUB_STEP_SUMMARY
+          echo "3. Run your benchmark tests" >> $GITHUB_STEP_SUMMARY
+
