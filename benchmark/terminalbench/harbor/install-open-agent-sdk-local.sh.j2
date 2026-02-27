@@ -1,0 +1,41 @@
+#!/bin/bash
+set -euo pipefail
+
+# Install dependencies if not available
+if command -v apk &> /dev/null; then
+    apk add --no-cache curl bash git
+elif command -v apt-get &> /dev/null; then
+    apt-get update
+    apt-get install -y curl git
+fi
+
+# Install Bun if not present
+if ! command -v bun &> /dev/null; then
+    curl -fsSL https://bun.sh/install | bash
+fi
+export PATH="$HOME/.bun/bin:$PATH"
+
+# Clone repository (shallow clone for faster installation)
+echo "Cloning open-agent-sdk from GitHub..."
+git clone --depth 1 https://github.com/Octane0411/open-agent-sdk.git /tmp/open-agent-sdk
+
+# Build packages locally
+echo "Building packages..."
+cd /tmp/open-agent-sdk
+bun install
+
+# Build core package
+cd packages/core
+bun run build
+cd ../..
+
+# Link CLI globally
+cd packages/cli
+bun link
+cd ../..
+
+# Ensure bun bin is in PATH
+export PATH="$HOME/.bun/bin:$PATH"
+
+echo "Bun ready: $(bun --version)"
+echo "CLI ready: $(which oas)"
