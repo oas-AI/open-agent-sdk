@@ -51,3 +51,6 @@ RELEASE_NOTES.md
 
 # Worktrees
 .worktrees/
+
+# Harbor benchmark results
+jobs/
