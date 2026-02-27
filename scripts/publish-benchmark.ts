@@ -13,8 +13,10 @@
  * 5. 发布 CLI
  *
  * 用法:
- *   bun scripts/publish-benchmark.ts           # 真实发布
- *   bun scripts/publish-benchmark.ts --dry-run # 测试模式（不真发布）
+ *   bun scripts/publish-benchmark.ts                    # 真实发布
+ *   bun scripts/publish-benchmark.ts --dry-run          # 测试模式（不真发布）
+ *   bun scripts/publish-benchmark.ts --skip-tests       # 跳过测试（不推荐）
+ *   bun scripts/publish-benchmark.ts --dry-run --skip-tests  # 测试模式 + 跳过测试
  */
 
 import { readFileSync, writeFileSync } from 'fs';
@@ -27,6 +29,7 @@ const CLI_PKG_PATH = join(ROOT_DIR, 'packages/cli/package.json');
 
 // 检查是否为 dry-run 模式
 const DRY_RUN = process.argv.includes('--dry-run');
+const SKIP_TESTS = process.argv.includes('--skip-tests');
 
 // 颜色输出
 const colors = {
@@ -119,6 +122,9 @@ async function main() {
   if (DRY_RUN) {
     log('║                  🧪 DRY RUN MODE                      ║', 'yellow');
   }
+  if (SKIP_TESTS) {
+    log('║              ⚠️  SKIPPING TESTS                       ║', 'yellow');
+  }
   log('╚════════════════════════════════════════════════════════╝', 'bright');
 
   // 1. 生成 canary 版本号
@@ -133,20 +139,24 @@ async function main() {
       log('Uncommitted changes:', 'yellow');
       console.log(status);
 
-      // 询问是否继续
-      const readline = require('readline').createInterface({
-        input: process.stdin,
-        output: process.stdout,
-      });
+      if (DRY_RUN) {
+        log('\n[DRY RUN] Continuing automatically...', 'yellow');
+      } else {
+        // 询问是否继续
+        const readline = require('readline').createInterface({
+          input: process.stdin,
+          output: process.stdout,
+        });
 
-      const answer = await new Promise<string>(resolve => {
-        readline.question('\nContinue anyway? (y/N): ', resolve);
-      });
-      readline.close();
+        const answer = await new Promise<string>(resolve => {
+          readline.question('\nContinue anyway? (y/N): ', resolve);
+        });
+        readline.close();
 
-      if (answer.toLowerCase() !== 'y') {
-        log('\n❌ Aborted by user', 'red');
-        process.exit(1);
+        if (answer.toLowerCase() !== 'y') {
+          log('\n❌ Aborted by user', 'red');
+          process.exit(1);
+        }
       }
     }
   } catch (error) {
@@ -159,13 +169,18 @@ async function main() {
   log(`   ✓ packages/core/package.json → ${canaryVersion}`, 'green');
 
   // 4. 运行 SDK 测试
-  log('\n🧪 Running SDK tests...', 'blue');
-  try {
-    execCommand('cd packages/core && bun test', 'Running tests');
-    log('   ✓ All tests passed', 'green');
-  } catch (error) {
-    log('\n❌ Tests failed! Please fix the tests before publishing.', 'red');
-    process.exit(1);
+  if (SKIP_TESTS) {
+    log('\n🧪 Skipping SDK tests...', 'yellow');
+    log('   ⚠️  Tests skipped (--skip-tests flag)', 'yellow');
+  } else {
+    log('\n🧪 Running SDK tests...', 'blue');
+    try {
+      execCommand('cd packages/core && bun test', 'Running tests');
+      log('   ✓ All tests passed', 'green');
+    } catch (error) {
+      log('\n❌ Tests failed! Please fix the tests before publishing.', 'red');
+      process.exit(1);
+    }
   }
 
   // 5. 构建 SDK
