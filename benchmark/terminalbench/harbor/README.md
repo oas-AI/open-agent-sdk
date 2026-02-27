@@ -140,6 +140,129 @@ Agent 代码 (create_run_agent_commands)
 - alex@laude.org
 - mikeam@cs.stanford.edu
 
+## Local Development Testing
+
+Before publishing to npm, you can test Harbor integration with local source code.
+
+### Prerequisites
+
+1. **Colima** (Docker-compatible runtime)
+   ```bash
+   colima start
+   ```
+
+2. **Harbor** (Python >= 3.12)
+   ```bash
+   pip install harbor
+   ```
+
+3. **MiniMax API credentials**
+   ```bash
+   export ANTHROPIC_AUTH_TOKEN="sk-api-..."
+   export ANTHROPIC_BASE_URL="https://api.minimaxi.com/anthropic/v1"
+   ```
+
+### Quick Test
+
+Use the automated test script:
+
+```bash
+# Set MiniMax API credentials
+export ANTHROPIC_AUTH_TOKEN="sk-api-..."
+export ANTHROPIC_BASE_URL="https://api.minimaxi.com/anthropic/v1"
+
+# Run test
+./scripts/test-harbor-local.sh
+```
+
+This script will:
+1. Check all prerequisites (Colima, Harbor, API keys)
+2. Register the local development agent
+3. Run the hello-world test task
+4. Display results (reward: 1 = success, 0 = failure)
+
+### Manual Testing
+
+For more control, you can run tests manually:
+
+```bash
+# 1. Register local development agent
+ln -sf $(pwd)/benchmark/terminalbench/harbor/agent_local.py \
+  $(python -c "import harbor; print(harbor.__path__[0])")/agents/installed/open_agent_sdk_local.py
+
+# 2. Set MiniMax credentials
+export ANTHROPIC_AUTH_TOKEN="sk-api-..."
+export ANTHROPIC_BASE_URL="https://api.minimaxi.com/anthropic/v1"
+
+# 3. Run single task
+harbor jobs start \
+  --path benchmark/terminalbench/test-tasks/hello-world \
+  --agent-import-path "harbor.agents.installed.open_agent_sdk_local:OpenAgentSDKAgentLocal" \
+  --model MiniMax-M2.5
+
+# 4. Check results in logs
+# Look for "reward: 1" in verifier output
+```
+
+### How It Works
+
+**Local Development Flow:**
+```
+Host Machine
+  ↓ Set ANTHROPIC_AUTH_TOKEN + ANTHROPIC_BASE_URL
+Harbor Agent (agent_local.py)
+  ↓ Use install-open-agent-sdk-local.sh.j2
+Sandbox Container
+  ↓ git clone --depth 1 https://github.com/Octane0411/open-agent-sdk.git
+  ↓ bun install && bun run build
+  ↓ cd packages/cli && bun link
+  ↓ Run: oas -p "..." --model MiniMax-M2.5 --base-url https://api.minimaxi.com/anthropic/v1
+  ↓ Call MiniMax API via Anthropic-compatible endpoint
+  ↓ Generate output and save to files
+Verifier
+  ↓ Check output files and write reward (1 or 0) to /logs/verifier/reward.txt
+```
+
+**Key differences from production:**
+- Installs from GitHub repository (not npm)
+- Builds packages locally in container
+- Uses `bun link` for global CLI access
+- Requires code to be pushed to GitHub before testing
+
+### Troubleshooting
+
+**Issue: "Colima is not running"**
+```bash
+colima start
+```
+
+**Issue: "Harbor is not installed"**
+```bash
+pip install harbor
+```
+
+**Issue: "ANTHROPIC_AUTH_TOKEN is not set"**
+```bash
+export ANTHROPIC_AUTH_TOKEN="sk-api-..."
+export ANTHROPIC_BASE_URL="https://api.minimaxi.com/anthropic/v1"
+```
+
+**Issue: "git clone failed in container"**
+- Ensure your changes are pushed to GitHub
+- Check network connectivity in container
+- Try: `docker pull ubuntu:24.04` to test Docker networking
+
+**Issue: "bun install failed"**
+- Check container has internet access
+- Verify package.json is valid
+- Check Bun installation logs
+
+**Issue: "reward: 0" (test failed)**
+- Check container logs for errors
+- Verify API credentials are correct
+- Check if `greeting.txt` was created
+- Verify greeting has ≥10 words and contains greeting keywords
+
 ## 参考
 
 - [Terminal-bench](https://www.tbench.ai/leaderboard/terminal-bench/2.0)
