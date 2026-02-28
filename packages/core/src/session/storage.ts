@@ -73,8 +73,14 @@ export interface SessionOptions {
 
 /** Storage interface for session persistence */
 export interface SessionStorage {
-  /** Save session data */
+  /** Save session data (writes header + all messages — used for initial creation and resume) */
   save(data: SessionData): Promise<void>;
+  /**
+   * Append a single message to an existing session.
+   * Called immediately when each message is generated so data survives crashes.
+   * The session must already exist (save() must have been called first).
+   */
+  append(id: string, message: SDKMessage): Promise<void>;
   /** Load session by ID, returns null if not found */
   load(id: string): Promise<SessionData | null>;
   /** Delete session by ID */
@@ -100,6 +106,14 @@ export class InMemoryStorage implements SessionStorage {
 
   async save(data: SessionData): Promise<void> {
     this.sessions.set(data.id, { ...data });
+  }
+
+  async append(id: string, message: SDKMessage): Promise<void> {
+    const existing = this.sessions.get(id);
+    if (existing) {
+      existing.messages.push(message);
+      existing.updatedAt = Date.now();
+    }
   }
 
   async load(id: string): Promise<SessionData | null> {
@@ -187,6 +201,19 @@ export class FileStorage implements SessionStorage {
     }
 
     await Bun.write(filePath, lines.join('\n') + '\n');
+  }
+
+  async append(id: string, message: SDKMessage): Promise<void> {
+    const filePath = this.getFilePath(id);
+
+    const file = Bun.file(filePath);
+    if (!(await file.exists())) {
+      // File doesn't exist yet (createSession not called first) — skip silently
+      return;
+    }
+
+    const { appendFileSync } = await import('fs');
+    appendFileSync(filePath, JSON.stringify(message) + '\n');
   }
 
   async load(id: string): Promise<SessionData | null> {

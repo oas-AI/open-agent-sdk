@@ -321,6 +321,12 @@ export class Session {
     };
 
     this.messages.push(userMessage);
+
+    // Persist immediately — crash-safe
+    if (this.storage) {
+      await this.storage.append(this.id, userMessage);
+    }
+
     this._state = SessionState.READY;
   }
 
@@ -367,16 +373,19 @@ export class Session {
         switch (event.type) {
           case 'assistant':
             this.messages.push(event.message);
+            if (this.storage) await this.storage.append(this.id, event.message);
             yield event.message;
             break;
 
           case 'skill_system':
             this.messages.push(event.message);
+            if (this.storage) await this.storage.append(this.id, event.message);
             yield event.message;
             break;
 
           case 'tool_result':
             this.messages.push(event.message);
+            if (this.storage) await this.storage.append(this.id, event.message);
             yield event.message;
             break;
 
@@ -402,8 +411,9 @@ export class Session {
         this._state = SessionState.IDLE;
       }
 
-      // Save to storage after stream completes
-      if (this.storage) {
+      // Update header's updatedAt on successful completion (happy path only)
+      // Messages are already persisted per-append above; this just keeps the header fresh
+      if (this.storage && this._state === SessionState.IDLE) {
         await this.saveToStorage();
       }
     }
