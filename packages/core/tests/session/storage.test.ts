@@ -364,6 +364,216 @@ describe('FileStorage', () => {
   });
 });
 
+describe('FileStorage with cwd option', () => {
+  it('should resolve to project-grouped directory when cwd is provided', () => {
+    const storage = new FileStorage({ cwd: '/Users/foo/bar' });
+    const dir = (storage as unknown as { directory: string }).directory;
+    const homeDir = process.env.HOME || process.env.USERPROFILE || '.';
+    expect(dir).toBe(`${homeDir}/.open-agent/projects/-Users-foo-bar`);
+  });
+
+  it('should prefer directory over cwd when both are provided', () => {
+    const storage = new FileStorage({ directory: '/explicit/path', cwd: '/Users/foo/bar' });
+    const dir = (storage as unknown as { directory: string }).directory;
+    expect(dir).toBe('/explicit/path');
+  });
+
+  it('should fall back to legacy path when neither directory nor cwd is provided', () => {
+    const storage = new FileStorage();
+    const dir = (storage as unknown as { directory: string }).directory;
+    const homeDir = process.env.HOME || process.env.USERPROFILE || '.';
+    expect(dir).toBe(`${homeDir}/.open-agent/sessions`);
+  });
+});
+
+describe('FileStorage sessions-index.json', () => {
+  const testDir = '/tmp/open-agent-test-index';
+
+  beforeEach(async () => {
+    try {
+      await Bun.spawn(['rm', '-rf', testDir]).exited;
+    } catch {
+      // Ignore cleanup errors
+    }
+  });
+
+  it('should create sessions-index.json when saving a session', async () => {
+    const storage = new FileStorage({ directory: testDir });
+    const sessionId = generateUUID();
+    const now = Date.now();
+
+    await storage.save({
+      id: sessionId,
+      model: 'gpt-4o',
+      provider: 'openai',
+      createdAt: now,
+      updatedAt: now,
+      messages: [],
+      options: { model: 'gpt-4o' },
+    });
+
+    const indexFile = Bun.file(`${testDir}/sessions-index.json`);
+    expect(await indexFile.exists()).toBe(true);
+
+    const index = JSON.parse(await indexFile.text());
+    expect(index.sessions).toHaveLength(1);
+    expect(index.sessions[0].id).toBe(sessionId);
+  });
+
+  it('should store firstPrompt from first user message', async () => {
+    const storage = new FileStorage({ directory: testDir });
+    const sessionId = generateUUID();
+    const now = Date.now();
+
+    await storage.save({
+      id: sessionId,
+      model: 'gpt-4o',
+      provider: 'openai',
+      createdAt: now,
+      updatedAt: now,
+      messages: [
+        {
+          type: 'user',
+          uuid: 'uuid-1',
+          session_id: sessionId,
+          message: { role: 'user', content: 'Hello world' },
+          parent_tool_use_id: null,
+        },
+      ],
+      options: { model: 'gpt-4o' },
+    });
+
+    const index = JSON.parse(await Bun.file(`${testDir}/sessions-index.json`).text());
+    expect(index.sessions[0].firstPrompt).toBe('Hello world');
+  });
+
+  it('should set firstPrompt to empty string when no messages', async () => {
+    const storage = new FileStorage({ directory: testDir });
+    const sessionId = generateUUID();
+    const now = Date.now();
+
+    await storage.save({
+      id: sessionId,
+      model: 'gpt-4o',
+      provider: 'openai',
+      createdAt: now,
+      updatedAt: now,
+      messages: [],
+      options: { model: 'gpt-4o' },
+    });
+
+    const index = JSON.parse(await Bun.file(`${testDir}/sessions-index.json`).text());
+    expect(index.sessions[0].firstPrompt).toBe('');
+  });
+
+  it('should upsert entry in index on repeated save', async () => {
+    const storage = new FileStorage({ directory: testDir });
+    const sessionId = generateUUID();
+    const now = Date.now();
+
+    await storage.save({
+      id: sessionId,
+      model: 'gpt-4o',
+      provider: 'openai',
+      createdAt: now,
+      updatedAt: now,
+      messages: [],
+      options: { model: 'gpt-4o' },
+    });
+
+    await storage.save({
+      id: sessionId,
+      model: 'gpt-4o',
+      provider: 'openai',
+      createdAt: now,
+      updatedAt: now + 1000,
+      messages: [
+        {
+          type: 'user',
+          uuid: 'uuid-1',
+          session_id: sessionId,
+          message: { role: 'user', content: 'Updated prompt' },
+          parent_tool_use_id: null,
+        },
+      ],
+      options: { model: 'gpt-4o' },
+    });
+
+    const index = JSON.parse(await Bun.file(`${testDir}/sessions-index.json`).text());
+    expect(index.sessions).toHaveLength(1);
+    expect(index.sessions[0].firstPrompt).toBe('Updated prompt');
+  });
+
+  it('should remove entry from index when session is deleted', async () => {
+    const storage = new FileStorage({ directory: testDir });
+    const sessionId = generateUUID();
+    const now = Date.now();
+
+    await storage.save({
+      id: sessionId,
+      model: 'gpt-4o',
+      provider: 'openai',
+      createdAt: now,
+      updatedAt: now,
+      messages: [],
+      options: { model: 'gpt-4o' },
+    });
+
+    await storage.delete(sessionId);
+
+    const index = JSON.parse(await Bun.file(`${testDir}/sessions-index.json`).text());
+    expect(index.sessions).toHaveLength(0);
+  });
+
+  it('should list sessions by reading from index', async () => {
+    const storage = new FileStorage({ directory: testDir });
+    const id1 = generateUUID();
+    const id2 = generateUUID();
+    const now = Date.now();
+
+    for (const id of [id1, id2]) {
+      await storage.save({
+        id,
+        model: 'gpt-4o',
+        provider: 'openai',
+        createdAt: now,
+        updatedAt: now,
+        messages: [],
+        options: { model: 'gpt-4o' },
+      });
+    }
+
+    // Remove the JSONL files to confirm list() reads from index not dir scan
+    await Bun.spawn(['rm', '-f', `${testDir}/${id1}.jsonl`, `${testDir}/${id2}.jsonl`]).exited;
+
+    const list = await storage.list();
+    expect(list).toContain(id1);
+    expect(list).toContain(id2);
+  });
+
+  it('should fall back to dir scan when sessions-index.json is missing', async () => {
+    const storage = new FileStorage({ directory: testDir });
+    const sessionId = generateUUID();
+    const now = Date.now();
+
+    await storage.save({
+      id: sessionId,
+      model: 'gpt-4o',
+      provider: 'openai',
+      createdAt: now,
+      updatedAt: now,
+      messages: [],
+      options: { model: 'gpt-4o' },
+    });
+
+    // Remove the index file to force fallback
+    await Bun.spawn(['rm', '-f', `${testDir}/sessions-index.json`]).exited;
+
+    const list = await storage.list();
+    expect(list).toContain(sessionId);
+  });
+});
+
 describe('SessionData interface', () => {
   it('should have all required fields', () => {
     const sessionData: SessionData = {

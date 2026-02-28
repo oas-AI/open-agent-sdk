@@ -87,8 +87,30 @@ export interface SessionStorage {
 
 /** File storage options */
 export interface FileStorageOptions {
-  /** Directory path for session files (default: ~/.open-agent/sessions) */
+  /** Directory path for session files (takes priority over cwd) */
   directory?: string;
+  /** Working directory to derive project-grouped storage path */
+  cwd?: string;
+}
+
+/** Encode a path for use as a directory name (replaces / with -) */
+function encodePath(cwd: string): string {
+  return cwd.replace(/\//g, '-');
+}
+
+/** Single entry in the sessions index */
+interface SessionIndexEntry {
+  id: string;
+  firstPrompt: string;
+  messageCount: number;
+  created: number;
+  modified: number;
+}
+
+/** Sessions index file structure */
+interface SessionsIndex {
+  projectPath: string;
+  sessions: SessionIndexEntry[];
 }
 
 /**
@@ -144,9 +166,73 @@ export class FileStorage implements SessionStorage {
   private directory: string;
 
   constructor(options: FileStorageOptions = {}) {
-    // Default to ~/.open-agent/sessions
     const homeDir = process.env.HOME || process.env.USERPROFILE || '.';
-    this.directory = options.directory || `${homeDir}/.open-agent/sessions`;
+    if (options.directory) {
+      this.directory = options.directory;
+    } else if (options.cwd) {
+      this.directory = `${homeDir}/.open-agent/projects/${encodePath(options.cwd)}`;
+    } else {
+      this.directory = `${homeDir}/.open-agent/sessions`;
+    }
+  }
+
+  private get indexPath(): string {
+    return `${this.directory}/sessions-index.json`;
+  }
+
+  private async readIndex(): Promise<SessionsIndex> {
+    const file = Bun.file(this.indexPath);
+    const text = await file.text();
+    return JSON.parse(text) as SessionsIndex;
+  }
+
+  private async writeIndex(index: SessionsIndex): Promise<void> {
+    await Bun.write(this.indexPath, JSON.stringify(index, null, 2) + '\n');
+  }
+
+  private async upsertIndexEntry(data: SessionData): Promise<void> {
+    let index: SessionsIndex;
+    try {
+      index = await this.readIndex();
+    } catch {
+      index = { projectPath: '', sessions: [] };
+    }
+
+    const firstUserMessage = data.messages.find(
+      (m) => m.type === 'user'
+    );
+    let firstPrompt = '';
+    if (firstUserMessage && firstUserMessage.type === 'user') {
+      const content = firstUserMessage.message.content;
+      firstPrompt = typeof content === 'string' ? content : '';
+    }
+
+    const entry: SessionIndexEntry = {
+      id: data.id,
+      firstPrompt,
+      messageCount: data.messages.length,
+      created: data.createdAt,
+      modified: data.updatedAt,
+    };
+
+    const idx = index.sessions.findIndex((s) => s.id === data.id);
+    if (idx >= 0) {
+      index.sessions[idx] = entry;
+    } else {
+      index.sessions.push(entry);
+    }
+
+    await this.writeIndex(index);
+  }
+
+  private async removeIndexEntry(id: string): Promise<void> {
+    try {
+      const index = await this.readIndex();
+      index.sessions = index.sessions.filter((s) => s.id !== id);
+      await this.writeIndex(index);
+    } catch {
+      // Index missing — nothing to remove
+    }
   }
 
   private getFilePath(id: string): string {
@@ -187,6 +273,7 @@ export class FileStorage implements SessionStorage {
     }
 
     await Bun.write(filePath, lines.join('\n') + '\n');
+    await this.upsertIndexEntry(data);
   }
 
   async load(id: string): Promise<SessionData | null> {
@@ -240,19 +327,26 @@ export class FileStorage implements SessionStorage {
     } catch {
       // Ignore errors for non-existent files
     }
+    await this.removeIndexEntry(id);
   }
 
   async list(): Promise<string[]> {
     try {
-      const proc = Bun.spawn(['ls', '-1', this.directory]);
-      const output = await new Response(proc.stdout).text();
-      return output
-        .split('\n')
-        .filter((f) => f.endsWith('.jsonl'))
-        .map((f) => f.replace(/\.jsonl$/, ''))
-        .filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
+      const idx = await this.readIndex();
+      return idx.sessions.map((s) => s.id);
     } catch {
-      return [];
+      // Fallback: directory scan
+      try {
+        const proc = Bun.spawn(['ls', '-1', this.directory]);
+        const output = await new Response(proc.stdout).text();
+        return output
+          .split('\n')
+          .filter((f) => f.endsWith('.jsonl'))
+          .map((f) => f.replace(/\.jsonl$/, ''))
+          .filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
+      } catch {
+        return [];
+      }
     }
   }
 

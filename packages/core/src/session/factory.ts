@@ -9,7 +9,7 @@ import { AnthropicProvider } from '../providers/anthropic';
 import { createDefaultRegistry } from '../tools/registry';
 import { ReActLoop } from '../agent/react-loop';
 import { Session } from './session';
-import { InMemoryStorage, type SessionStorage, type SessionData } from './storage';
+import { FileStorage, InMemoryStorage, type SessionStorage, type SessionData } from './storage';
 import { logger, type LogLevel } from '../utils/logger';
 import { generateUUID } from '../utils/uuid';
 import { createSkillRegistry } from '../skills/registry';
@@ -151,8 +151,8 @@ export async function createSession(options: CreateSessionOptions): Promise<Sess
     );
   }
 
-  // Create storage (default to InMemoryStorage)
-  const storage = options.storage ?? new InMemoryStorage();
+  // Create storage (default to FileStorage with project-grouped path)
+  const storage = options.storage ?? new FileStorage({ cwd: options.cwd ?? process.cwd() });
 
   // Create provider
   let provider;
