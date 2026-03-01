@@ -7,6 +7,23 @@ import { OpenAIProvider } from '../providers/openai';
 import { GoogleProvider } from '../providers/google';
 import { AnthropicProvider } from '../providers/anthropic';
 import { createDefaultRegistry } from '../tools/registry';
+
+/**
+ * Check if a base URL requires Bearer token authentication instead of x-api-key
+ * @param baseURL - The API base URL
+ * @returns true if Bearer auth is required (e.g., MiniMax)
+ */
+function requiresBearerAuth(baseURL?: string): boolean {
+  if (!baseURL) return false;
+
+  // Known endpoints that require Authorization: Bearer instead of x-api-key
+  const bearerAuthHosts = [
+    'api.minimaxi.com',
+    // Add other Anthropic-compatible endpoints here as needed
+  ];
+
+  return bearerAuthHosts.some(host => baseURL.includes(host));
+}
 import { ReActLoop } from '../agent/react-loop';
 import { Session } from './session';
 import { FileStorage, InMemoryStorage, type SessionStorage, type SessionData } from './storage';
@@ -26,7 +43,7 @@ export interface CreateSessionOptions {
   model: string;
   /** Provider to use: 'openai', 'google', or 'anthropic' (auto-detected from model name if not specified) */
   provider?: 'openai' | 'google' | 'anthropic';
-  /** API key (defaults to OPENAI_API_KEY or GEMINI_API_KEY env var based on provider) */
+  /** API key (defaults to OPENAI_API_KEY, GEMINI_API_KEY, or ANTHROPIC_API_KEY env var based on provider) */
   apiKey?: string;
   /** Base URL override for API endpoint (used for proxies or compatible APIs like MiniMax) */
   baseURL?: string;
@@ -159,7 +176,15 @@ export async function createSession(options: CreateSessionOptions): Promise<Sess
   if (providerType === 'google') {
     provider = new GoogleProvider({ apiKey, model: options.model });
   } else if (providerType === 'anthropic') {
-    provider = new AnthropicProvider({ apiKey, model: options.model, baseURL: options.baseURL });
+    // Auto-detect authentication method based on baseURL
+    // For Anthropic-compatible APIs like MiniMax, use Bearer token authentication
+    const useBearerAuth = requiresBearerAuth(options.baseURL);
+    provider = new AnthropicProvider({
+      apiKey: useBearerAuth ? undefined : apiKey,
+      authToken: useBearerAuth ? apiKey : undefined,
+      model: options.model,
+      baseURL: options.baseURL,
+    });
   } else {
     provider = new OpenAIProvider({ apiKey, model: options.model, baseURL: options.baseURL });
   }
