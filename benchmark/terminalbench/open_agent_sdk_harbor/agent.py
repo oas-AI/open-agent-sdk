@@ -97,18 +97,14 @@ class OpenAgentSDKAgent(BaseInstalledAgent):
 
         # Use heredoc to safely pass instruction without escaping
         # This handles multi-line text and special characters correctly
-        # Add debug output to diagnose execution issues
+        # Unset proxy variables to avoid connection issues in Docker containers
+        # (containers can't access host's 127.0.0.1 proxy)
         command = f"""export PATH="$HOME/.bun/bin:$PATH" && \\
-echo "DEBUG: PATH=$PATH" && \\
-echo "DEBUG: which oas=$(which oas 2>&1)" && \\
-echo "DEBUG: oas exists: $(test -f $(which oas 2>/dev/null) && echo yes || echo no)" && \\
-echo "DEBUG: Starting CLI execution at $(date)" && \\
+unset https_proxy http_proxy all_proxy HTTPS_PROXY HTTP_PROXY ALL_PROXY && \\
 {CLI_COMMAND} -p "$(cat <<'INSTRUCTION_EOF'
 {instruction}
 INSTRUCTION_EOF
-)" {cli_flags} 2>&1 && \\
-echo "DEBUG: CLI finished successfully at $(date)" || \\
-echo "DEBUG: CLI failed with exit code $? at $(date)" """
+)" {cli_flags}"""
 
         return [
             ExecInput(
