@@ -97,10 +97,18 @@ class OpenAgentSDKAgent(BaseInstalledAgent):
 
         # Use heredoc to safely pass instruction without escaping
         # This handles multi-line text and special characters correctly
-        command = f"""export PATH="$HOME/.bun/bin:$PATH" && {CLI_COMMAND} -p "$(cat <<'INSTRUCTION_EOF'
+        # Add debug output to diagnose execution issues
+        command = f"""export PATH="$HOME/.bun/bin:$PATH" && \\
+echo "DEBUG: PATH=$PATH" && \\
+echo "DEBUG: which oas=$(which oas 2>&1)" && \\
+echo "DEBUG: oas exists: $(test -f $(which oas 2>/dev/null) && echo yes || echo no)" && \\
+echo "DEBUG: Starting CLI execution at $(date)" && \\
+{CLI_COMMAND} -p "$(cat <<'INSTRUCTION_EOF'
 {instruction}
 INSTRUCTION_EOF
-)" {cli_flags}"""
+)" {cli_flags} 2>&1 && \\
+echo "DEBUG: CLI finished successfully at $(date)" || \\
+echo "DEBUG: CLI failed with exit code $? at $(date)" """
 
         return [
             ExecInput(
